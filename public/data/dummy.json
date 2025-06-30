@@ -1,0 +1,383 @@
+{
+  "users": [
+    {
+      "id": "user_001",
+      "name": "Ahmad Syahputra",
+      "email": "ahmad.admin@company.com",
+      "phone": "08123456789",
+      "role": "admin",
+      "created_at": "2024-01-15T08:00:00Z",
+      "last_login": "2025-06-30T07:30:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_002",
+      "name": "Siti Rahma",
+      "email": "siti.finance@company.com",
+      "phone": "08234567890",
+      "role": "finance",
+      "created_at": "2024-01-20T09:00:00Z",
+      "last_login": "2025-06-29T16:45:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_003",
+      "name": "Budi Santoso",
+      "email": "budi.collector@company.com",
+      "phone": "08345678901",
+      "role": "collector",
+      "area": "Medan Utara",
+      "created_at": "2024-02-01T10:00:00Z",
+      "last_login": "2025-06-30T06:00:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_004",
+      "name": "Rina Collector",
+      "email": "rina.collector@company.com",
+      "phone": "08456789012",
+      "role": "collector",
+      "area": "Medan Selatan",
+      "created_at": "2024-02-15T11:00:00Z",
+      "last_login": "2025-06-29T18:20:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_005",
+      "name": "Dewi Sartika",
+      "email": "dewi.nasabah@gmail.com",
+      "phone": "08567890123",
+      "role": "nasabah",
+      "address": "Jl. Sisingamangaraja No. 45, Medan",
+      "ktp": "1271234567890001",
+      "created_at": "2024-03-01T12:00:00Z",
+      "last_login": "2025-06-28T19:30:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_006",
+      "name": "Hendra Wijaya",
+      "email": "hendra.nasabah@gmail.com",
+      "phone": "08678901234",
+      "role": "nasabah",
+      "address": "Jl. Gatot Subroto No. 123, Medan",
+      "ktp": "1271234567890002",
+      "created_at": "2024-03-15T13:00:00Z",
+      "last_login": "2025-06-29T20:15:00Z",
+      "is_active": true
+    },
+    {
+      "id": "user_007",
+      "name": "Maya Indah",
+      "email": "maya.nasabah@gmail.com",
+      "phone": "08789012345",
+      "role": "nasabah",
+      "address": "Jl. Pemuda No. 67, Medan",
+      "ktp": "1271234567890003",
+      "created_at": "2024-04-01T14:00:00Z",
+      "last_login": "2025-06-30T08:45:00Z",
+      "is_active": true
+    }
+  ],
+  "loans": [
+    {
+      "id": "loan_001",
+      "nasabah_id": "user_005",
+      "loan_amount": 50000000,
+      "interest_rate": 2.5,
+      "loan_period": 12,
+      "monthly_payment": 4545454,
+      "loan_status": "active",
+      "loan_date": "2024-03-01T12:00:00Z",
+      "due_date": "2025-03-01T12:00:00Z",
+      "collector_id": "user_003",
+      "purpose": "Modal Usaha Warung",
+      "collateral": "BPKB Motor Yamaha Vixion 2020"
+    },
+    {
+      "id": "loan_002",
+      "nasabah_id": "user_006",
+      "loan_amount": 75000000,
+      "interest_rate": 2.8,
+      "loan_period": 18,
+      "monthly_payment": 4722222,
+      "loan_status": "active",
+      "loan_date": "2024-03-15T13:00:00Z",
+      "due_date": "2025-09-15T13:00:00Z",
+      "collector_id": "user_003",
+      "purpose": "Renovasi Rumah",
+      "collateral": "Sertifikat Tanah 200m²"
+    },
+    {
+      "id": "loan_003",
+      "nasabah_id": "user_007",
+      "loan_amount": 30000000,
+      "interest_rate": 2.2,
+      "loan_period": 10,
+      "monthly_payment": 3272727,
+      "loan_status": "active",
+      "loan_date": "2024-04-01T14:00:00Z",
+      "due_date": "2025-02-01T14:00:00Z",
+      "collector_id": "user_004",
+      "purpose": "Biaya Pendidikan",
+      "collateral": "BPKB Mobil Avanza 2019"
+    }
+  ],
+  "installments": [
+    {
+      "id": "inst_001",
+      "loan_id": "loan_001",
+      "installment_number": 1,
+      "due_date": "2024-04-01T12:00:00Z",
+      "amount": 4545454,
+      "paid_amount": 4545454,
+      "payment_date": "2024-04-01T10:30:00Z",
+      "status": "paid",
+      "late_fee": 0,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_002",
+      "loan_id": "loan_001",
+      "installment_number": 2,
+      "due_date": "2024-05-01T12:00:00Z",
+      "amount": 4545454,
+      "paid_amount": 4545454,
+      "payment_date": "2024-05-02T14:20:00Z",
+      "status": "paid",
+      "late_fee": 50000,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_003",
+      "loan_id": "loan_001",
+      "installment_number": 3,
+      "due_date": "2024-06-01T12:00:00Z",
+      "amount": 4545454,
+      "paid_amount": 2000000,
+      "payment_date": "2024-06-05T16:45:00Z",
+      "status": "partial",
+      "late_fee": 100000,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_004",
+      "loan_id": "loan_001",
+      "installment_number": 4,
+      "due_date": "2024-07-01T12:00:00Z",
+      "amount": 4545454,
+      "paid_amount": 0,
+      "payment_date": null,
+      "status": "overdue",
+      "late_fee": 200000,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_005",
+      "loan_id": "loan_002",
+      "installment_number": 1,
+      "due_date": "2024-04-15T13:00:00Z",
+      "amount": 4722222,
+      "paid_amount": 4722222,
+      "payment_date": "2024-04-15T11:15:00Z",
+      "status": "paid",
+      "late_fee": 0,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_006",
+      "loan_id": "loan_002",
+      "installment_number": 2,
+      "due_date": "2024-05-15T13:00:00Z",
+      "amount": 4722222,
+      "paid_amount": 4722222,
+      "payment_date": "2024-05-14T09:30:00Z",
+      "status": "paid",
+      "late_fee": 0,
+      "collector_id": "user_003"
+    },
+    {
+      "id": "inst_007",
+      "loan_id": "loan_003",
+      "installment_number": 1,
+      "due_date": "2024-05-01T14:00:00Z",
+      "amount": 3272727,
+      "paid_amount": 3272727,
+      "payment_date": "2024-05-01T08:45:00Z",
+      "status": "paid",
+      "late_fee": 0,
+      "collector_id": "user_004"
+    },
+    {
+      "id": "inst_008",
+      "loan_id": "loan_003",
+      "installment_number": 2,
+      "due_date": "2024-06-01T14:00:00Z",
+      "amount": 3272727,
+      "paid_amount": 0,
+      "payment_date": null,
+      "status": "pending",
+      "late_fee": 0,
+      "collector_id": "user_004"
+    }
+  ],
+  "collection_tasks": [
+    {
+      "id": "task_001",
+      "collector_id": "user_003",
+      "nasabah_id": "user_005",
+      "loan_id": "loan_001",
+      "installment_id": "inst_003",
+      "task_date": "2024-06-05T06:00:00Z",
+      "status": "completed",
+      "result": "sebagian",
+      "amount_collected": 2000000,
+      "notes": "Nasabah hanya bisa bayar sebagian karena usaha sedang sepi. Janji akan melunasi minggu depan.",
+      "visit_time": "2024-06-05T16:45:00Z",
+      "location": "Jl. Sisingamangaraja No. 45, Medan"
+    },
+    {
+      "id": "task_002",
+      "collector_id": "user_003",
+      "nasabah_id": "user_005",
+      "loan_id": "loan_001",
+      "installment_id": "inst_004",
+      "task_date": "2024-07-05T06:00:00Z",
+      "status": "pending",
+      "result": "belum",
+      "amount_collected": 0,
+      "notes": "Belum dikunjungi, jadwal kunjungan hari ini.",
+      "visit_time": null,
+      "location": "Jl. Sisingamangaraja No. 45, Medan"
+    },
+    {
+      "id": "task_003",
+      "collector_id": "user_003",
+      "nasabah_id": "user_006",
+      "loan_id": "loan_002",
+      "installment_id": "inst_005",
+      "task_date": "2024-04-15T06:00:00Z",
+      "status": "completed",
+      "result": "selesai",
+      "amount_collected": 4722222,
+      "notes": "Pembayaran lancar, nasabah kooperatif.",
+      "visit_time": "2024-04-15T11:15:00Z",
+      "location": "Jl. Gatot Subroto No. 123, Medan"
+    },
+    {
+      "id": "task_004",
+      "collector_id": "user_004",
+      "nasabah_id": "user_007",
+      "loan_id": "loan_003",
+      "installment_id": "inst_008",
+      "task_date": "2024-06-30T06:00:00Z",
+      "status": "in_progress",
+      "result": "belum",
+      "amount_collected": 0,
+      "notes": "Sedang dalam perjalanan ke lokasi nasabah.",
+      "visit_time": null,
+      "location": "Jl. Pemuda No. 67, Medan"
+    },
+    {
+      "id": "task_005",
+      "collector_id": "user_003",
+      "nasabah_id": "user_006",
+      "loan_id": "loan_002",
+      "installment_id": "inst_006",
+      "task_date": "2024-05-14T06:00:00Z",
+      "status": "completed",
+      "result": "selesai",
+      "amount_collected": 4722222,
+      "notes": "Pembayaran dilakukan lebih awal dari jadwal. Nasabah sangat kooperatif.",
+      "visit_time": "2024-05-14T09:30:00Z",
+      "location": "Jl. Gatot Subroto No. 123, Medan"
+    }
+  ],
+  "overview": {
+    "summary": {
+      "total_loans": 3,
+      "total_loan_amount": 155000000,
+      "total_active_loans": 3,
+      "total_completed_loans": 0,
+      "total_users": 7,
+      "total_nasabah": 3,
+      "total_collectors": 2,
+      "total_outstanding": 139727273
+    },
+    "collection_performance": {
+      "today": {
+        "date": "2025-06-30",
+        "scheduled_collections": 2,
+        "completed_collections": 0,
+        "in_progress_collections": 1,
+        "pending_collections": 1,
+        "total_target_amount": 7818181,
+        "total_collected_amount": 0
+      },
+      "this_month": {
+        "month": "2025-06",
+        "scheduled_collections": 4,
+        "completed_collections": 2,
+        "total_target_amount": 7818181,
+        "total_collected_amount": 2000000,
+        "collection_rate": 25.6
+      },
+      "overall": {
+        "total_tasks": 5,
+        "completed_tasks": 3,
+        "success_rate": 60,
+        "total_collected": 16439999,
+        "average_collection_per_task": 3287999.8
+      }
+    },
+    "loan_status_distribution": {
+      "active": 3,
+      "completed": 0,
+      "defaulted": 0,
+      "restructured": 0
+    },
+    "installment_status_distribution": {
+      "paid": 5,
+      "partial": 1,
+      "pending": 1,
+      "overdue": 1
+    },
+    "collector_performance": [
+      {
+        "collector_id": "user_003",
+        "collector_name": "Budi Santoso",
+        "area": "Medan Utara",
+        "total_tasks": 4,
+        "completed_tasks": 3,
+        "success_rate": 75,
+        "total_collected": 13439999,
+        "total_loans_handled": 2
+      },
+      {
+        "collector_id": "user_004",
+        "collector_name": "Rina Collector",
+        "area": "Medan Selatan",
+        "total_tasks": 1,
+        "completed_tasks": 0,
+        "success_rate": 0,
+        "total_collected": 3272727,
+        "total_loans_handled": 1
+      }
+    ],
+    "financial_summary": {
+      "total_disbursed": 155000000,
+      "total_collected": 39439999,
+      "outstanding_principal": 115560001,
+      "total_interest_earned": 1879998,
+      "total_late_fees": 350000,
+      "collection_ratio": 25.4
+    },
+    "risk_analysis": {
+      "overdue_installments": 1,
+      "partial_payments": 1,
+      "high_risk_loans": 1,
+      "total_overdue_amount": 4745454,
+      "days_past_due_average": 30
+    }
+  }
+}
