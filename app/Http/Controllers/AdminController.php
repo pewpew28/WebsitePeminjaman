@@ -2,253 +2,271 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Installment;
+use App\Models\Loan;
+use App\Models\Nasabah;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class AdminController extends Controller
 {
-    private $data;
-
-    public function __construct()
-    {
-        $this->data = json_decode(file_get_contents(public_path('data/dummy.json')), true);
-    }
-
     public function dashboard()
     {
-        $data = $this->data;
-        return view('admin.dashboard', compact('data'));
+        // 1. RINGKASAN KEUANGAN
+        $financialSummary = [
+            'total_active_loans' => $this->getTotalActiveLoans(),
+            'total_payments_received' => $this->getTotalPaymentsReceived(),
+            'total_overdue' => $this->getTotalOverdue(),
+            'monthly_income' => $this->getMonthlyIncome(),
+        ];
+
+        // 2. STATISTIK NASABAH & PINJAMAN
+        $customerStats = [
+            'new_customers_count' => $this->getNewCustomersThisMonth(),
+            'new_customers_growth' => $this->getNewCustomersGrowth(),
+            'new_loans_count' => $this->getNewLoansThisMonth(),
+            'new_loans_growth' => $this->getNewLoansGrowth(),
+            'total_customers' => $this->getTotalCustomers(),
+            'active_customers_percentage' => $this->getActiveCustomersPercentage(),
+        ];
+
+        // 3. AKTIVITAS TERBARU
+        $recentActivities = $this->getRecentActivities();
+
+        return view('admin.dashboard', compact(
+            'financialSummary',
+            'customerStats',
+            'recentActivities'
+        ));
     }
 
-    public function userIndex()
-{
-    $title = 'Manajemen Users';
+    public function userIndex(Request $request)
+    {
+        $query = User::query();
 
-    // Assume $this->data['users'] is a Collection
-    $allUsers = collect($this->data['users']);
+        // Filter berdasarkan pencarian
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone_number', 'like', "%{$search}%");
+            });
+        }
 
-    // Manually paginate
-    $perPage = 5;
-    $currentPage = request()->get('page', 1);
-    $pagedData = $allUsers->slice(($currentPage - 1) * $perPage, $perPage);
-    $data = new LengthAwarePaginator(
-        $pagedData,
-        $allUsers->count(),
-        $perPage,
-        $currentPage,
-        ['path' => request()->url(), 'query' => request()->query()]
-    );
+        // Filter berdasarkan role
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
 
-    // Recalculate stats if needed
-    $stats = [
-        'total_users' => $allUsers->count(),
-        'admin_count' => $allUsers->where('role', 'admin')->count(),
-        'collector_count' => $allUsers->where('role', 'collector')->count(),
-        'nasabah_count' => $allUsers->where('role', 'nasabah')->count(),
-        'finance_count' => $allUsers->where('role', 'finance')->count(),
-    ];
+        // Filter berdasarkan status
+        if ($request->filled('status')) {
+            if ($request->status === 'active') {
+                $query->whereNotNull('last_login_at');
+            } else {
+                $query->whereNull('last_login_at');
+            }
+        }
 
-    return view('admin.users.index', compact('title', 'data', 'stats'));
-}
+        // Order by created_at descending
+        $query->orderBy('created_at', 'desc');
+
+        $users = $query->paginate(10);
+
+        // Statistik untuk summary cards
+        $stats = [
+            'total' => User::count(),
+            'admin' => User::where('role', 'admin')->count(),
+            'finance' => User::where('role', 'finance')->count(),
+            'collector' => User::where('role', 'collector')->count(),
+            'nasabah' => User::where('role', 'nasabah')->count(),
+        ];
+
+        return view('admin.users.index', compact('users', 'stats'));
+    }
 
     public function userCreate()
     {
-        $title = 'Tambah User';
-        $roles = ['admin', 'finance', 'collector', 'nasabah'];
-        return view('admin.users.create', compact('title', 'roles'));
+        return view('admin.users.create');
     }
 
     public function userStore(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'phone' => 'required|string|max:15',
+            'email' => 'required|string|email|max:255|unique:users',
+            'phone_number' => 'nullable|string|max:20',
             'role' => 'required|in:admin,finance,collector,nasabah',
-            'address' => 'required_if:role,nasabah,collector',
-            'ktp' => 'required_if:role,nasabah',
-            'area' => 'required_if:role,collector',
+            'password' => 'required|string|min:8|confirmed',
+            'address' => 'nullable|string|max:500',
         ]);
 
-        // Simulasi penyimpanan data
-        // Dalam implementasi nyata, simpan ke database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil ditambahkan');
-    }
-
-    public function userShow($id)
-    {
-        $title = 'Detail User';
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-
-        // Get additional data based on user role
-        $additionalData = [];
-        
-        if ($user['role'] === 'nasabah') {
-            $additionalData['loans'] = array_filter($this->data['loans'], 
-                fn($loan) => $loan['nasabah_id'] === $id
-            );
-            $additionalData['installments'] = array_filter($this->data['installments'],
-                fn($installment) => in_array($installment['loan_id'], array_column($additionalData['loans'], 'id'))
-            );
-        } elseif ($user['role'] === 'collector') {
-            $additionalData['tasks'] = array_filter($this->data['collection_tasks'],
-                fn($task) => $task['collector_id'] === $id
-            );
-            $additionalData['assigned_loans'] = array_filter($this->data['loans'],
-                fn($loan) => $loan['collector_id'] === $id
-            );
-        }
-        
-        return view('admin.users.show', compact('title', 'user', 'additionalData'));
-    }
-
-    public function userEdit($id)
-    {
-        $title = 'Edit User';
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-        
-        $roles = ['admin', 'finance', 'collector', 'nasabah'];
-        return view('admin.users.edit', compact('title', 'user', 'roles'));
-    }
-
-    public function userUpdate(Request $request, $id)
-    {
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
-            'phone' => 'required|string|max:15',
-            'role' => 'required|in:admin,finance,collector,nasabah',
-            'address' => 'required_if:role,nasabah,collector',
-            'ktp' => 'required_if:role,nasabah',
-            'area' => 'required_if:role,collector',
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone_number' => $request->phone_number,
+            'role' => $request->role,
+            'password' => bcrypt($request->password),
+            'address' => $request->address,
+            'email_verified_at' => now(), // Auto verify for admin created users
         ]);
 
-        // Simulasi update data
-        // Dalam implementasi nyata, update ke database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil diupdate');
+        return redirect()->route('admin.users.index')
+            ->with('success', 'User berhasil ditambahkan.');
+    }
+    public function userShow(User $user)
+    {
+        return view('admin.users.show', compact('user'));
     }
 
-    public function userDestroy($id)
+    // RINGKASAN KEUANGAN METHODS
+    private function getTotalActiveLoans()
     {
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-
-        // Simulasi hapus data
-        // Dalam implementasi nyata, hapus dari database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus');
+        return Loan::whereIn('status', ['active', 'disbursed'])
+            ->sum('loan_amount');
     }
 
-    // Loan Management Methods
-    public function loanIndex()
+    private function getTotalPaymentsReceived()
     {
-        $title = 'Manajemen Pinjaman';
-        $loans = $this->data['loans'];
-        
-        // Enrich loan data with nasabah info
-        foreach ($loans as &$loan) {
-            $nasabah = collect($this->data['users'])->firstWhere('id', $loan['nasabah_id']);
-            $loan['nasabah_name'] = $nasabah['name'] ?? 'Unknown';
-            
-            $collector = collect($this->data['users'])->firstWhere('id', $loan['collector_id']);
-            $loan['collector_name'] = $collector['name'] ?? 'Unassigned';
-        }
-        
-        $stats = [
-            'total_loans' => count($loans),
-            'active_loans' => count(array_filter($loans, fn($loan) => $loan['loan_status'] === 'active')),
-            'total_amount' => array_sum(array_column($loans, 'loan_amount')),
-        ];
-        
-        return view('admin.loans.index', compact('title', 'loans', 'stats'));
+        // Total pembayaran yang diterima bulan ini dari installments
+        return Installment::where('status', 'paid')
+            ->whereMonth('payment_date', Carbon::now()->month)
+            ->whereYear('payment_date', Carbon::now()->year)
+            ->sum('amount_paid');
     }
 
-    public function loanShow($id)
+    private function getTotalOverdue()
     {
-        $title = 'Detail Pinjaman';
-        $loan = collect($this->data['loans'])->firstWhere('id', $id);
-        
-        if (!$loan) {
-            abort(404, 'Pinjaman tidak ditemukan');
-        }
-
-        // Get related data
-        $nasabah = collect($this->data['users'])->firstWhere('id', $loan['nasabah_id']);
-        $collector = collect($this->data['users'])->firstWhere('id', $loan['collector_id']);
-        $installments = array_filter($this->data['installments'], 
-            fn($installment) => $installment['loan_id'] === $id
-        );
-        
-        return view('admin.loans.show', compact('title', 'loan', 'nasabah', 'collector', 'installments'));
+        return Loan::whereIn('status', ['active', 'disbursed'])
+            ->where('end_date', '<', Carbon::now())
+            ->sum('remaining_principal');
     }
 
-    // Collection Tasks Methods
-    public function taskIndex()
+    private function getMonthlyIncome()
     {
-        $title = 'Manajemen Tugas Penagihan';
-        $tasks = $this->data['collection_tasks'];
-        
-        // Enrich task data
-        foreach ($tasks as &$task) {
-            $collector = collect($this->data['users'])->firstWhere('id', $task['collector_id']);
-            $task['collector_name'] = $collector['name'] ?? 'Unknown';
-            
-            $nasabah = collect($this->data['users'])->firstWhere('id', $task['nasabah_id']);
-            $task['nasabah_name'] = $nasabah['name'] ?? 'Unknown';
-        }
-        
-        $stats = [
-            'total_tasks' => count($tasks),
-            'completed_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'completed')),
-            'pending_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'pending')),
-            'in_progress_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'in_progress')),
-        ];
-        
-        return view('admin.tasks.index', compact('title', 'tasks', 'stats'));
+        // Pendapatan bunga dari installments yang dibayar bulan ini
+        return Installment::where('status', 'paid')
+            ->whereMonth('payment_date', Carbon::now()->month)
+            ->whereYear('payment_date', Carbon::now()->year)
+            ->sum('interest_amount');
     }
 
-    // Reports Methods
-    public function reports()
+    // STATISTIK NASABAH & PINJAMAN METHODS
+    private function getNewCustomersThisMonth()
     {
-        $title = 'Laporan';
-        $overview = $this->data['overview'];
-        
-        return view('admin.reports.index', compact('title', 'overview'));
+        return Nasabah::whereMonth('created_at', Carbon::now()->month)
+            ->whereYear('created_at', Carbon::now()->year)
+            ->count();
     }
 
-    // API Methods for AJAX requests
-    public function getUsersApi(Request $request)
+    private function getNewCustomersGrowth()
     {
-        $users = $this->data['users'];
-        
-        if ($request->has('role')) {
-            $users = array_filter($users, fn($user) => $user['role'] === $request->role);
-        }
-        
-        return response()->json($users);
+        $thisMonth = $this->getNewCustomersThisMonth();
+        $lastMonth = Nasabah::whereMonth('created_at', Carbon::now()->subMonth()->month)
+            ->whereYear('created_at', Carbon::now()->subMonth()->year)
+            ->count();
+
+        if ($lastMonth == 0) return 0;
+        return round((($thisMonth - $lastMonth) / $lastMonth) * 100, 0);
     }
 
-    public function getOverviewApi()
+    private function getNewLoansThisMonth()
     {
-        return response()->json($this->data['overview']);
+        return Loan::whereMonth('created_at', Carbon::now()->month)
+            ->whereYear('created_at', Carbon::now()->year)
+            ->count();
+    }
+
+    private function getNewLoansGrowth()
+    {
+        $thisMonth = $this->getNewLoansThisMonth();
+        $lastMonth = Loan::whereMonth('created_at', Carbon::now()->subMonth()->month)
+            ->whereYear('created_at', Carbon::now()->subMonth()->year)
+            ->count();
+
+        if ($lastMonth == 0) return 0;
+        return round((($thisMonth - $lastMonth) / $lastMonth) * 100, 0);
+    }
+
+    private function getTotalCustomers()
+    {
+        return Nasabah::count();
+    }
+
+    private function getActiveCustomersPercentage()
+    {
+        $totalCustomers = $this->getTotalCustomers();
+        // Nasabah dianggap aktif jika memiliki pinjaman yang masih berjalan
+        $activeCustomers = Nasabah::whereHas('loans', function ($query) {
+            $query->whereIn('status', ['active', 'disbursed']);
+        })->count();
+
+        if ($totalCustomers == 0) return 0;
+        return round(($activeCustomers / $totalCustomers) * 100, 0);
+    }
+
+    // AKTIVITAS TERBARU METHOD
+    private function getRecentActivities()
+    {
+        $activities = collect();
+
+        // Nasabah baru (5 terakhir)
+        $newCustomers = Nasabah::latest()
+            ->take(5)
+            ->get()
+            ->map(function ($nasabah) {
+                return [
+                    'type' => 'new_customer',
+                    'icon_class' => 'bg-green-100 text-green-600',
+                    'title' => 'Nasabah baru: ' . $nasabah->name,
+                    'time' => $nasabah->created_at->diffForHumans(),
+                    'created_at' => $nasabah->created_at
+                ];
+            });
+
+        // Pinjaman disetujui (5 terakhir)
+        $approvedLoans = Loan::with('nasabah')
+            ->whereIn('status', ['approved', 'disbursed'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($loan) {
+                return [
+                    'type' => 'loan_approved',
+                    'icon_class' => 'bg-blue-100 text-blue-600',
+                    'title' => 'Pinjaman disetujui: Rp ' . number_format($loan->loan_amount / 1000000, 1) . 'jt - ' . $loan->nasabah->name,
+                    'time' => $loan->updated_at->diffForHumans(),
+                    'created_at' => $loan->updated_at
+                ];
+            });
+
+        // Pembayaran terbaru berdasarkan installments yang sudah dibayar (5 terakhir)
+        $recentPayments = Installment::with('loan.nasabah')
+            ->where('status', 'paid')
+            ->whereNotNull('payment_date')
+            ->where('amount_paid', '>', 0)
+            ->latest('payment_date')
+            ->take(5)
+            ->get()
+            ->map(function ($installment) {
+                return [
+                    'type' => 'payment_received',
+                    'icon_class' => 'bg-purple-100 text-purple-600',
+                    'title' => 'Pembayaran diterima: Rp ' . number_format($installment->amount_paid / 1000, 0) . 'rb - ' . $installment->loan->nasabah->name,
+                    'time' => $installment->payment_date->diffForHumans(),
+                    'created_at' => $installment->payment_date
+                ];
+            });
+
+        // Gabungkan semua aktivitas dan urutkan berdasarkan waktu
+        $activities = $activities->concat($newCustomers)
+            ->concat($approvedLoans)
+            ->concat($recentPayments)
+            ->sortByDesc('created_at')
+            ->take(10); // Ambil 10 aktivitas terakhir
+
+        return $activities->values();
     }
 }

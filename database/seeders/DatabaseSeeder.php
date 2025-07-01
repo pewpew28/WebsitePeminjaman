@@ -13,8 +13,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
+        // Panggil seeder
         $this->call(UserSeeder::class);
+        $this->call(SettingSeeder::class);
+        $this->call(NasabahSeeder::class);
+        $this->call(LoanSeeder::class);
+        $this->call(InstallmentSeeder::class);
+        $this->call(CollectorTaskSeeder::class);
     }
 }

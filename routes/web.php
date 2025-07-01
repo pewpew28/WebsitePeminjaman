@@ -25,6 +25,12 @@ Route::middleware(['auth'])->group(function () {
 
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [AdminController::class, 'userIndex'])->name('index');
+            Route::get('/create', [AdminController::class, 'userCreate'])->name('create');
+            Route::get('/store', [AdminController::class, 'userStore'])->name('store');
+            Route::get('/{userId}/show', [AdminController::class, 'userShow'])->name('show');
+            Route::get('/{userId}/edit', [AdminController::class, 'userEdit'])->name('edit');
+            Route::get('/{userId}/update', [AdminController::class, 'userUpdate'])->name('update');
+            Route::get('/{userId}/destroy', [AdminController::class, 'userDestroy'])->name('destroy');
         });
     });
 
