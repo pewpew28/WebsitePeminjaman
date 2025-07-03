@@ -6,83 +6,47 @@ use App\Models\Installment;
 use App\Models\Loan;
 use App\Models\Nasabah;
 use App\Models\User;
+use App\Services\AdminDashboardService;
+use App\Services\UserManagementService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
+    private AdminDashboardService $dashboardService;
+    private UserManagementService $userService;
+
+    public function __construct(
+        AdminDashboardService $dashboardService,
+        UserManagementService $userService
+    ) {
+        $this->dashboardService = $dashboardService;
+        $this->userService = $userService;
+    }
+
     public function dashboard()
     {
-        // 1. RINGKASAN KEUANGAN
-        $financialSummary = [
-            'total_active_loans' => $this->getTotalActiveLoans(),
-            'total_payments_received' => $this->getTotalPaymentsReceived(),
-            'total_overdue' => $this->getTotalOverdue(),
-            'monthly_income' => $this->getMonthlyIncome(),
-        ];
+        $cacheKey = 'admin_dashboard_' . Carbon::now()->format('Y-m-d-H');
 
-        // 2. STATISTIK NASABAH & PINJAMAN
-        $customerStats = [
-            'new_customers_count' => $this->getNewCustomersThisMonth(),
-            'new_customers_growth' => $this->getNewCustomersGrowth(),
-            'new_loans_count' => $this->getNewLoansThisMonth(),
-            'new_loans_growth' => $this->getNewLoansGrowth(),
-            'total_customers' => $this->getTotalCustomers(),
-            'active_customers_percentage' => $this->getActiveCustomersPercentage(),
-        ];
+        $dashboardData = Cache::remember($cacheKey, 3600, function () {
+            return [
+                'financialSummary' => $this->dashboardService->getFinancialSummary(),
+                'customerStats' => $this->dashboardService->getCustomerStats(),
+                'recentActivities' => $this->dashboardService->getRecentActivities(),
+            ];
+        });
 
-        // 3. AKTIVITAS TERBARU
-        $recentActivities = $this->getRecentActivities();
-
-        return view('admin.dashboard', compact(
-            'financialSummary',
-            'customerStats',
-            'recentActivities'
-        ));
+        return view('admin.dashboard', $dashboardData);
     }
 
     public function userIndex(Request $request)
     {
-        $query = User::query();
-
-        // Filter berdasarkan pencarian
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter berdasarkan role
-        if ($request->filled('role')) {
-            $query->where('role', $request->role);
-        }
-
-        // Filter berdasarkan status
-        if ($request->filled('status')) {
-            if ($request->status === 'active') {
-                $query->whereNotNull('last_login_at');
-            } else {
-                $query->whereNull('last_login_at');
-            }
-        }
-
-        // Order by created_at descending
-        $query->orderBy('created_at', 'desc');
-
-        $users = $query->paginate(10);
-
-        // Statistik untuk summary cards
-        $stats = [
-            'total' => User::count(),
-            'admin' => User::where('role', 'admin')->count(),
-            'finance' => User::where('role', 'finance')->count(),
-            'collector' => User::where('role', 'collector')->count(),
-            'nasabah' => User::where('role', 'nasabah')->count(),
-        ];
+        $filters = $request->only(['search', 'role', 'status']);
+        $users = $this->userService->getFilteredUsers($filters);
+        $stats = $this->userService->getUserStats();
 
         return view('admin.users.index', compact('users', 'stats'));
     }
@@ -94,179 +58,162 @@ class AdminController extends Controller
 
     public function userStore(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'phone_number' => 'nullable|string|max:20',
-            'role' => 'required|in:admin,finance,collector,nasabah',
-            'password' => 'required|string|min:8|confirmed',
-            'address' => 'nullable|string|max:500',
-        ]);
+        $validatedData = $request->validate($this->getUserValidationRules());
 
-        User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone_number' => $request->phone_number,
-            'role' => $request->role,
-            'password' => bcrypt($request->password),
-            'address' => $request->address,
-            'email_verified_at' => now(), // Auto verify for admin created users
-        ]);
-
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User berhasil ditambahkan.');
+        try {
+            $user = $this->userService->createUser($validatedData, $request->file('profile_picture'));
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            return back()->withInput()
+                ->with('error', 'Gagal membuat user: ' . $e->getMessage());
+        }
     }
+
     public function userShow(User $user)
     {
         return view('admin.users.show', compact('user'));
     }
 
-    // RINGKASAN KEUANGAN METHODS
-    private function getTotalActiveLoans()
+    public function userEdit(User $user)
     {
-        return Loan::whereIn('status', ['active', 'disbursed'])
-            ->sum('loan_amount');
+        return view('admin.users.edit', compact('user'));
     }
 
-    private function getTotalPaymentsReceived()
+    public function userUpdate(Request $request, User $user)
     {
-        // Total pembayaran yang diterima bulan ini dari installments
-        return Installment::where('status', 'paid')
-            ->whereMonth('payment_date', Carbon::now()->month)
-            ->whereYear('payment_date', Carbon::now()->year)
-            ->sum('amount_paid');
+        $validatedData = $request->validate($this->getUserValidationRules($user->id));
+
+        try {
+            $this->userService->updateUser($user, $validatedData, $request->file('profile_picture'));
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil diperbarui.');
+        } catch (\Exception $e) {
+            return back()->withInput()
+                ->with('error', 'Gagal memperbarui user: ' . $e->getMessage());
+        }
     }
 
-    private function getTotalOverdue()
+    public function userDestroy(User $user)
     {
-        return Loan::whereIn('status', ['active', 'disbursed'])
-            ->where('end_date', '<', Carbon::now())
-            ->sum('remaining_principal');
+        try {
+            $this->userService->deleteUser($user);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dihapus.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('admin.users.index')
+                ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Terjadi kesalahan saat menghapus user: ' . $e->getMessage());
+        }
     }
 
-    private function getMonthlyIncome()
+    public function userRestore($id)
     {
-        // Pendapatan bunga dari installments yang dibayar bulan ini
-        return Installment::where('status', 'paid')
-            ->whereMonth('payment_date', Carbon::now()->month)
-            ->whereYear('payment_date', Carbon::now()->year)
-            ->sum('interest_amount');
+        try {
+            $this->userService->restoreUser($id);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dipulihkan.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat memulihkan user: ' . $e->getMessage());
+        }
     }
 
-    // STATISTIK NASABAH & PINJAMAN METHODS
-    private function getNewCustomersThisMonth()
+    public function userForceDelete($id)
     {
-        return Nasabah::whereMonth('created_at', Carbon::now()->month)
-            ->whereYear('created_at', Carbon::now()->year)
-            ->count();
+        try {
+            $this->userService->forceDeleteUser($id);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dihapus permanen.');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat menghapus permanen user: ' . $e->getMessage());
+        }
     }
 
-    private function getNewCustomersGrowth()
+    public function userTrashed(Request $request)
     {
-        $thisMonth = $this->getNewCustomersThisMonth();
-        $lastMonth = Nasabah::whereMonth('created_at', Carbon::now()->subMonth()->month)
-            ->whereYear('created_at', Carbon::now()->subMonth()->year)
-            ->count();
+        $filters = $request->only(['search', 'role']);
+        $trashedUsers = $this->userService->getTrashedUsers($filters);
 
-        if ($lastMonth == 0) return 0;
-        return round((($thisMonth - $lastMonth) / $lastMonth) * 100, 0);
+        return view('admin.users.trashed', compact('trashedUsers'));
     }
 
-    private function getNewLoansThisMonth()
+    public function userToggleStatus(User $user)
     {
-        return Loan::whereMonth('created_at', Carbon::now()->month)
-            ->whereYear('created_at', Carbon::now()->year)
-            ->count();
+        try {
+            $this->userService->toggleUserStatus($user);
+            $status = $user->fresh()->last_seen_at ? 'diaktifkan' : 'dinonaktifkan';
+            return redirect()->back()
+                ->with('success', "User berhasil {$status}.");
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat mengubah status user: ' . $e->getMessage());
+        }
     }
 
-    private function getNewLoansGrowth()
+    public function nasabahIndex(Request $request)
     {
-        $thisMonth = $this->getNewLoansThisMonth();
-        $lastMonth = Loan::whereMonth('created_at', Carbon::now()->subMonth()->month)
-            ->whereYear('created_at', Carbon::now()->subMonth()->year)
-            ->count();
-
-        if ($lastMonth == 0) return 0;
-        return round((($thisMonth - $lastMonth) / $lastMonth) * 100, 0);
-    }
-
-    private function getTotalCustomers()
-    {
-        return Nasabah::count();
-    }
-
-    private function getActiveCustomersPercentage()
-    {
-        $totalCustomers = $this->getTotalCustomers();
-        // Nasabah dianggap aktif jika memiliki pinjaman yang masih berjalan
-        $activeCustomers = Nasabah::whereHas('loans', function ($query) {
-            $query->whereIn('status', ['active', 'disbursed']);
-        })->count();
-
-        if ($totalCustomers == 0) return 0;
-        return round(($activeCustomers / $totalCustomers) * 100, 0);
-    }
-
-    // AKTIVITAS TERBARU METHOD
-    private function getRecentActivities()
-    {
-        $activities = collect();
-
-        // Nasabah baru (5 terakhir)
-        $newCustomers = Nasabah::latest()
-            ->take(5)
-            ->get()
-            ->map(function ($nasabah) {
-                return [
-                    'type' => 'new_customer',
-                    'icon_class' => 'bg-green-100 text-green-600',
-                    'title' => 'Nasabah baru: ' . $nasabah->name,
-                    'time' => $nasabah->created_at->diffForHumans(),
-                    'created_at' => $nasabah->created_at
-                ];
+        $query = Nasabah::with(['user', 'loans'])
+            ->when($request->search, function ($q) use ($request) {
+                $q->where(function ($query) use ($request) {
+                    $query->where('name', 'like', '%' . $request->search . '%')
+                        ->orWhere('email', 'like', '%' . $request->search . '%')
+                        ->orWhere('phone_number', 'like', '%' . $request->search . '%')
+                        ->orWhere('id_card_number', 'like', '%' . $request->search . '%');
+                });
+            })
+            ->when($request->status, function ($q) use ($request) {
+                $q->where('status', $request->status);
+            })
+            ->when($request->gender, function ($q) use ($request) {
+                $q->where('gender', $request->gender);
+            })
+            ->when($request->occupation, function ($q) use ($request) {
+                $q->where('occupation', 'like', '%' . $request->occupation . '%');
             });
 
-        // Pinjaman disetujui (5 terakhir)
-        $approvedLoans = Loan::with('nasabah')
-            ->whereIn('status', ['approved', 'disbursed'])
-            ->latest()
-            ->take(5)
-            ->get()
-            ->map(function ($loan) {
-                return [
-                    'type' => 'loan_approved',
-                    'icon_class' => 'bg-blue-100 text-blue-600',
-                    'title' => 'Pinjaman disetujui: Rp ' . number_format($loan->loan_amount / 1000000, 1) . 'jt - ' . $loan->nasabah->name,
-                    'time' => $loan->updated_at->diffForHumans(),
-                    'created_at' => $loan->updated_at
-                ];
-            });
+        // Handle with trashed if requested
+        if ($request->with_trashed) {
+            $query->withTrashed();
+        }
 
-        // Pembayaran terbaru berdasarkan installments yang sudah dibayar (5 terakhir)
-        $recentPayments = Installment::with('loan.nasabah')
-            ->where('status', 'paid')
-            ->whereNotNull('payment_date')
-            ->where('amount_paid', '>', 0)
-            ->latest('payment_date')
-            ->take(5)
-            ->get()
-            ->map(function ($installment) {
-                return [
-                    'type' => 'payment_received',
-                    'icon_class' => 'bg-purple-100 text-purple-600',
-                    'title' => 'Pembayaran diterima: Rp ' . number_format($installment->amount_paid / 1000, 0) . 'rb - ' . $installment->loan->nasabah->name,
-                    'time' => $installment->payment_date->diffForHumans(),
-                    'created_at' => $installment->payment_date
-                ];
-            });
+        $nasabah = $query->latest()->paginate(10);
 
-        // Gabungkan semua aktivitas dan urutkan berdasarkan waktu
-        $activities = $activities->concat($newCustomers)
-            ->concat($approvedLoans)
-            ->concat($recentPayments)
-            ->sortByDesc('created_at')
-            ->take(10); // Ambil 10 aktivitas terakhir
+        // Get statistics
+        $stats = [
+            'total' => Nasabah::count(),
+            'active' => Nasabah::where('status', 'active')->count(),
+            'inactive' => Nasabah::where('status', 'inactive')->count(),
+            'male' => Nasabah::where('gender', 'Laki-laki')->count(),
+            'female' => Nasabah::where('gender', 'Perempuan')->count(),
+            'with_loans' => Nasabah::has('loans')->count(),
+        ];
 
-        return $activities->values();
+        return view('admin.nasabah.index', compact('nasabah', 'stats'));
+    }
+
+    private function getUserValidationRules($userId = null): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users')->ignore($userId)
+            ],
+            'phone_number' => 'nullable|string|max:20',
+            'role' => 'required|in:admin,finance,collector,nasabah',
+            'password' => $userId ? 'nullable|string|min:8|confirmed' : 'required|string|min:8|confirmed',
+            'address' => 'nullable|string|max:500',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ];
     }
 }

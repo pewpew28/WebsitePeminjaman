@@ -19,17 +19,17 @@
 
     <!-- Nasabah -->
     <x-admin.nav-item 
-        href="" 
+        href="{{ route('admin.nasabahs.index') }}" 
         icon="fas fa-users"
-        :active="request()->routeIs('admin.nasabah.*')">
+        :active="request()->routeIs('admin.nasabahs.*')">
         Nasabah
     </x-admin.nav-item>
 
     <!-- Pinjaman -->
     <x-admin.nav-item 
-        href="" 
+        href="{{ route('admin.loans.index') }}" 
         icon="fas fa-hand-holding-usd"
-        :active="request()->routeIs('admin.pinjaman.*')">
+        :active="request()->routeIs('admin.loans.*')">
         Pinjaman
     </x-admin.nav-item>
 
@@ -67,9 +67,9 @@
 
     <!-- Settings -->
     <x-admin.nav-item 
-        href="{" 
+        href="{{ route('admin.settings.index') }}" 
         icon="fas fa-cog"
-        :active="request()->routeIs('admin.settings')">
+        :active="request()->routeIs('admin.settings.*')">
         Settings
     </x-admin.nav-item>
 </nav>
