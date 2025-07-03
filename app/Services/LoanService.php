@@ -5,14 +5,19 @@ namespace App\Services;
 use App\Repositories\LoanRepository;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class LoanService
 {
     protected $loanRepository;
+    protected $installmentService;
 
-    public function __construct(LoanRepository $loanRepository)
-    {
+    public function __construct(
+        LoanRepository $loanRepository,
+        InstallmentService $installmentService
+    ) {
         $this->loanRepository = $loanRepository;
+        $this->installmentService = $installmentService;
     }
 
     public function getAllLoans(array $filters = [])
@@ -38,8 +43,35 @@ class LoanService
     public function createLoan(array $data)
     {
         try {
-            return $this->loanRepository->create($data);
+            DB::beginTransaction();
+            
+            // Create loan
+            $loan = $this->loanRepository->create($data);
+            
+            // Create installments based on installment type
+            $installmentType = $data['term_unit'] ?? 'daily'; // daily, weekly, monthly
+            
+            switch ($installmentType) {
+                case 'weekly':
+                    $this->installmentService->createWeeklyInstallmentsForLoan($loan, $data);
+                    break;
+                case 'monthly':
+                    $this->installmentService->createMonthlyInstallmentsForLoan($loan, $data);
+                    break;
+                case 'daily':
+                default:
+                    $this->installmentService->createInstallmentsForLoan($loan, $data);
+                    break;
+            }
+            
+            DB::commit();
+            
+            Log::info("Loan created successfully with ID: {$loan->id}");
+            
+            return $loan;
+            
         } catch (Exception $e) {
+            DB::rollBack();
             Log::error('Error creating loan: ' . $e->getMessage());
             throw new Exception('Failed to create loan');
         }

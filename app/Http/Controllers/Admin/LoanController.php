@@ -49,6 +49,7 @@ class LoanController extends Controller
 
     public function store(StoreLoanRequest $request): RedirectResponse
     {
+        // dd($request->all());
         try {
             $loan = $this->loanService->createLoan($request->validated());
             return redirect()->route('admin.loans.index')->with('success', 'Loan created successfully');
