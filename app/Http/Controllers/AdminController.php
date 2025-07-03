@@ -2,253 +2,218 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Installment;
+use App\Models\Loan;
+use App\Models\Nasabah;
+use App\Models\User;
+use App\Services\AdminDashboardService;
+use App\Services\UserManagementService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
-    private $data;
+    private AdminDashboardService $dashboardService;
+    private UserManagementService $userService;
 
-    public function __construct()
-    {
-        $this->data = json_decode(file_get_contents(public_path('data/dummy.json')), true);
+    public function __construct(
+        AdminDashboardService $dashboardService,
+        UserManagementService $userService
+    ) {
+        $this->dashboardService = $dashboardService;
+        $this->userService = $userService;
     }
 
     public function dashboard()
     {
-        $data = $this->data;
-        return view('admin.dashboard', compact('data'));
+        $cacheKey = 'admin_dashboard_' . Carbon::now()->format('Y-m-d-H');
+
+        $dashboardData = Cache::remember($cacheKey, 3600, function () {
+            return [
+                'financialSummary' => $this->dashboardService->getFinancialSummary(),
+                'customerStats' => $this->dashboardService->getCustomerStats(),
+                'recentActivities' => $this->dashboardService->getRecentActivities(),
+            ];
+        });
+
+        return view('admin.dashboard', $dashboardData);
     }
 
-    public function userIndex()
-{
-    $title = 'Manajemen Users';
+    public function userIndex(Request $request)
+    {
+        $filters = $request->only(['search', 'role', 'status']);
+        $users = $this->userService->getFilteredUsers($filters);
+        $stats = $this->userService->getUserStats();
 
-    // Assume $this->data['users'] is a Collection
-    $allUsers = collect($this->data['users']);
-
-    // Manually paginate
-    $perPage = 5;
-    $currentPage = request()->get('page', 1);
-    $pagedData = $allUsers->slice(($currentPage - 1) * $perPage, $perPage);
-    $data = new LengthAwarePaginator(
-        $pagedData,
-        $allUsers->count(),
-        $perPage,
-        $currentPage,
-        ['path' => request()->url(), 'query' => request()->query()]
-    );
-
-    // Recalculate stats if needed
-    $stats = [
-        'total_users' => $allUsers->count(),
-        'admin_count' => $allUsers->where('role', 'admin')->count(),
-        'collector_count' => $allUsers->where('role', 'collector')->count(),
-        'nasabah_count' => $allUsers->where('role', 'nasabah')->count(),
-        'finance_count' => $allUsers->where('role', 'finance')->count(),
-    ];
-
-    return view('admin.users.index', compact('title', 'data', 'stats'));
-}
+        return view('admin.users.index', compact('users', 'stats'));
+    }
 
     public function userCreate()
     {
-        $title = 'Tambah User';
-        $roles = ['admin', 'finance', 'collector', 'nasabah'];
-        return view('admin.users.create', compact('title', 'roles'));
+        return view('admin.users.create');
     }
 
     public function userStore(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
-            'phone' => 'required|string|max:15',
-            'role' => 'required|in:admin,finance,collector,nasabah',
-            'address' => 'required_if:role,nasabah,collector',
-            'ktp' => 'required_if:role,nasabah',
-            'area' => 'required_if:role,collector',
-        ]);
+        $validatedData = $request->validate($this->getUserValidationRules());
 
-        // Simulasi penyimpanan data
-        // Dalam implementasi nyata, simpan ke database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil ditambahkan');
+        try {
+            $user = $this->userService->createUser($validatedData, $request->file('profile_picture'));
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil ditambahkan.');
+        } catch (\Exception $e) {
+            return back()->withInput()
+                ->with('error', 'Gagal membuat user: ' . $e->getMessage());
+        }
     }
 
-    public function userShow($id)
+    public function userShow(User $user)
     {
-        $title = 'Detail User';
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-
-        // Get additional data based on user role
-        $additionalData = [];
-        
-        if ($user['role'] === 'nasabah') {
-            $additionalData['loans'] = array_filter($this->data['loans'], 
-                fn($loan) => $loan['nasabah_id'] === $id
-            );
-            $additionalData['installments'] = array_filter($this->data['installments'],
-                fn($installment) => in_array($installment['loan_id'], array_column($additionalData['loans'], 'id'))
-            );
-        } elseif ($user['role'] === 'collector') {
-            $additionalData['tasks'] = array_filter($this->data['collection_tasks'],
-                fn($task) => $task['collector_id'] === $id
-            );
-            $additionalData['assigned_loans'] = array_filter($this->data['loans'],
-                fn($loan) => $loan['collector_id'] === $id
-            );
-        }
-        
-        return view('admin.users.show', compact('title', 'user', 'additionalData'));
+        return view('admin.users.show', compact('user'));
     }
 
-    public function userEdit($id)
+    public function userEdit(User $user)
     {
-        $title = 'Edit User';
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
-        }
-        
-        $roles = ['admin', 'finance', 'collector', 'nasabah'];
-        return view('admin.users.edit', compact('title', 'user', 'roles'));
+        return view('admin.users.edit', compact('user'));
     }
 
-    public function userUpdate(Request $request, $id)
+    public function userUpdate(Request $request, User $user)
     {
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
+        $validatedData = $request->validate($this->getUserValidationRules($user->id));
+
+        try {
+            $this->userService->updateUser($user, $validatedData, $request->file('profile_picture'));
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil diperbarui.');
+        } catch (\Exception $e) {
+            return back()->withInput()
+                ->with('error', 'Gagal memperbarui user: ' . $e->getMessage());
         }
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
-            'phone' => 'required|string|max:15',
-            'role' => 'required|in:admin,finance,collector,nasabah',
-            'address' => 'required_if:role,nasabah,collector',
-            'ktp' => 'required_if:role,nasabah',
-            'area' => 'required_if:role,collector',
-        ]);
-
-        // Simulasi update data
-        // Dalam implementasi nyata, update ke database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil diupdate');
     }
 
-    public function userDestroy($id)
+    public function userDestroy(User $user)
     {
-        $user = collect($this->data['users'])->firstWhere('id', $id);
-        
-        if (!$user) {
-            abort(404, 'User tidak ditemukan');
+        try {
+            $this->userService->deleteUser($user);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dihapus.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('admin.users.index')
+                ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Terjadi kesalahan saat menghapus user: ' . $e->getMessage());
         }
-
-        // Simulasi hapus data
-        // Dalam implementasi nyata, hapus dari database
-        
-        return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus');
     }
 
-    // Loan Management Methods
-    public function loanIndex()
+    public function userRestore($id)
     {
-        $title = 'Manajemen Pinjaman';
-        $loans = $this->data['loans'];
-        
-        // Enrich loan data with nasabah info
-        foreach ($loans as &$loan) {
-            $nasabah = collect($this->data['users'])->firstWhere('id', $loan['nasabah_id']);
-            $loan['nasabah_name'] = $nasabah['name'] ?? 'Unknown';
-            
-            $collector = collect($this->data['users'])->firstWhere('id', $loan['collector_id']);
-            $loan['collector_name'] = $collector['name'] ?? 'Unassigned';
+        try {
+            $this->userService->restoreUser($id);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dipulihkan.');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                ->with('error', $e->getMessage());
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat memulihkan user: ' . $e->getMessage());
         }
-        
+    }
+
+    public function userForceDelete($id)
+    {
+        try {
+            $this->userService->forceDeleteUser($id);
+            return redirect()->route('admin.users.index')
+                ->with('success', 'User berhasil dihapus permanen.');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat menghapus permanen user: ' . $e->getMessage());
+        }
+    }
+
+    public function userTrashed(Request $request)
+    {
+        $filters = $request->only(['search', 'role']);
+        $trashedUsers = $this->userService->getTrashedUsers($filters);
+
+        return view('admin.users.trashed', compact('trashedUsers'));
+    }
+
+    public function userToggleStatus(User $user)
+    {
+        try {
+            $this->userService->toggleUserStatus($user);
+            $status = $user->fresh()->last_seen_at ? 'diaktifkan' : 'dinonaktifkan';
+            return redirect()->back()
+                ->with('success', "User berhasil {$status}.");
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan saat mengubah status user: ' . $e->getMessage());
+        }
+    }
+
+    public function nasabahIndex(Request $request)
+    {
+        $query = Nasabah::with(['user', 'loans'])
+            ->when($request->search, function ($q) use ($request) {
+                $q->where(function ($query) use ($request) {
+                    $query->where('name', 'like', '%' . $request->search . '%')
+                        ->orWhere('email', 'like', '%' . $request->search . '%')
+                        ->orWhere('phone_number', 'like', '%' . $request->search . '%')
+                        ->orWhere('id_card_number', 'like', '%' . $request->search . '%');
+                });
+            })
+            ->when($request->status, function ($q) use ($request) {
+                $q->where('status', $request->status);
+            })
+            ->when($request->gender, function ($q) use ($request) {
+                $q->where('gender', $request->gender);
+            })
+            ->when($request->occupation, function ($q) use ($request) {
+                $q->where('occupation', 'like', '%' . $request->occupation . '%');
+            });
+
+        // Handle with trashed if requested
+        if ($request->with_trashed) {
+            $query->withTrashed();
+        }
+
+        $nasabah = $query->latest()->paginate(10);
+
+        // Get statistics
         $stats = [
-            'total_loans' => count($loans),
-            'active_loans' => count(array_filter($loans, fn($loan) => $loan['loan_status'] === 'active')),
-            'total_amount' => array_sum(array_column($loans, 'loan_amount')),
+            'total' => Nasabah::count(),
+            'active' => Nasabah::where('status', 'active')->count(),
+            'inactive' => Nasabah::where('status', 'inactive')->count(),
+            'male' => Nasabah::where('gender', 'Laki-laki')->count(),
+            'female' => Nasabah::where('gender', 'Perempuan')->count(),
+            'with_loans' => Nasabah::has('loans')->count(),
         ];
-        
-        return view('admin.loans.index', compact('title', 'loans', 'stats'));
+
+        return view('admin.nasabah.index', compact('nasabah', 'stats'));
     }
 
-    public function loanShow($id)
+    private function getUserValidationRules($userId = null): array
     {
-        $title = 'Detail Pinjaman';
-        $loan = collect($this->data['loans'])->firstWhere('id', $id);
-        
-        if (!$loan) {
-            abort(404, 'Pinjaman tidak ditemukan');
-        }
-
-        // Get related data
-        $nasabah = collect($this->data['users'])->firstWhere('id', $loan['nasabah_id']);
-        $collector = collect($this->data['users'])->firstWhere('id', $loan['collector_id']);
-        $installments = array_filter($this->data['installments'], 
-            fn($installment) => $installment['loan_id'] === $id
-        );
-        
-        return view('admin.loans.show', compact('title', 'loan', 'nasabah', 'collector', 'installments'));
-    }
-
-    // Collection Tasks Methods
-    public function taskIndex()
-    {
-        $title = 'Manajemen Tugas Penagihan';
-        $tasks = $this->data['collection_tasks'];
-        
-        // Enrich task data
-        foreach ($tasks as &$task) {
-            $collector = collect($this->data['users'])->firstWhere('id', $task['collector_id']);
-            $task['collector_name'] = $collector['name'] ?? 'Unknown';
-            
-            $nasabah = collect($this->data['users'])->firstWhere('id', $task['nasabah_id']);
-            $task['nasabah_name'] = $nasabah['name'] ?? 'Unknown';
-        }
-        
-        $stats = [
-            'total_tasks' => count($tasks),
-            'completed_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'completed')),
-            'pending_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'pending')),
-            'in_progress_tasks' => count(array_filter($tasks, fn($task) => $task['status'] === 'in_progress')),
+        return [
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('users')->ignore($userId)
+            ],
+            'phone_number' => 'nullable|string|max:20',
+            'role' => 'required|in:admin,finance,collector,nasabah',
+            'password' => $userId ? 'nullable|string|min:8|confirmed' : 'required|string|min:8|confirmed',
+            'address' => 'nullable|string|max:500',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
-        
-        return view('admin.tasks.index', compact('title', 'tasks', 'stats'));
-    }
-
-    // Reports Methods
-    public function reports()
-    {
-        $title = 'Laporan';
-        $overview = $this->data['overview'];
-        
-        return view('admin.reports.index', compact('title', 'overview'));
-    }
-
-    // API Methods for AJAX requests
-    public function getUsersApi(Request $request)
-    {
-        $users = $this->data['users'];
-        
-        if ($request->has('role')) {
-            $users = array_filter($users, fn($user) => $user['role'] === $request->role);
-        }
-        
-        return response()->json($users);
-    }
-
-    public function getOverviewApi()
-    {
-        return response()->json($this->data['overview']);
     }
 }

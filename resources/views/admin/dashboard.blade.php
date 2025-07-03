@@ -1,12 +1,16 @@
 <x-admin-layout>
+    <!-- Ringkasan Keuangan -->
     <div class="mb-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Ringkasan Keuangan</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Pinjaman Aktif -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600">Total Pinjaman Aktif</p>
-                        <p class="text-2xl font-bold text-blue-600">Rp 2.5M</p>
+                        <p class="text-2xl font-bold text-blue-600">
+                            Rp {{ number_format($financialSummary['total_active_loans'] / 1000000, 1) }}M
+                        </p>
                     </div>
                     <div class="bg-blue-100 p-3 rounded-full">
                         <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -18,11 +22,14 @@
                 </div>
             </div>
 
+            <!-- Total Pembayaran Diterima -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600">Total Pembayaran Diterima</p>
-                        <p class="text-2xl font-bold text-green-600">Rp 1.8M</p>
+                        <p class="text-2xl font-bold text-green-600">
+                            Rp {{ number_format($financialSummary['total_payments_received'] / 1000000, 1) }}M
+                        </p>
                     </div>
                     <div class="bg-green-100 p-3 rounded-full">
                         <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,11 +40,18 @@
                 </div>
             </div>
 
+            <!-- Total Tunggakan -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600">Tunggakan</p>
-                        <p class="text-2xl font-bold text-red-600">Rp 350K</p>
+                        <p class="text-2xl font-bold text-red-600">
+                            @if($financialSummary['total_overdue'] >= 1000000)
+                                Rp {{ number_format($financialSummary['total_overdue'] / 1000000, 1) }}M
+                            @else
+                                Rp {{ number_format($financialSummary['total_overdue'] / 1000, 0) }}K
+                            @endif
+                        </p>
                     </div>
                     <div class="bg-red-100 p-3 rounded-full">
                         <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,11 +63,14 @@
                 </div>
             </div>
 
+            <!-- Pendapatan Bulan Ini -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
-                        <p class="text-2xl font-bold text-purple-600">Rp 425K</p>
+                        <p class="text-2xl font-bold text-purple-600">
+                            Rp {{ number_format($financialSummary['monthly_income'] / 1000, 0) }}K
+                        </p>
                     </div>
                     <div class="bg-purple-100 p-3 rounded-full">
                         <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,36 +87,49 @@
     <div class="mb-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Statistik Nasabah & Pinjaman</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Nasabah Baru -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-medium text-gray-800">Nasabah Baru</h3>
                     <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Bulan Ini</span>
                 </div>
-                <div class="text-3xl font-bold text-blue-600 mb-2">15</div>
+                <div class="text-3xl font-bold text-blue-600 mb-2">{{ $customerStats['new_customers_count'] }}</div>
                 <p class="text-sm text-gray-600">
-                    <span class="text-green-600 font-medium">+25%</span> dari bulan lalu
+                    @if($customerStats['new_customers_growth'] >= 0)
+                        <span class="text-green-600 font-medium">+{{ $customerStats['new_customers_growth'] }}%</span>
+                    @else
+                        <span class="text-red-600 font-medium">{{ $customerStats['new_customers_growth'] }}%</span>
+                    @endif
+                    dari bulan lalu
                 </p>
             </div>
 
+            <!-- Pinjaman Baru -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-medium text-gray-800">Pinjaman Baru</h3>
                     <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">Bulan Ini</span>
                 </div>
-                <div class="text-3xl font-bold text-green-600 mb-2">12</div>
+                <div class="text-3xl font-bold text-green-600 mb-2">{{ $customerStats['new_loans_count'] }}</div>
                 <p class="text-sm text-gray-600">
-                    <span class="text-green-600 font-medium">+18%</span> dari bulan lalu
+                    @if($customerStats['new_loans_growth'] >= 0)
+                        <span class="text-green-600 font-medium">+{{ $customerStats['new_loans_growth'] }}%</span>
+                    @else
+                        <span class="text-red-600 font-medium">{{ $customerStats['new_loans_growth'] }}%</span>
+                    @endif
+                    dari bulan lalu
                 </p>
             </div>
 
+            <!-- Total Nasabah -->
             <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-medium text-gray-800">Total Nasabah</h3>
                     <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">Aktif</span>
                 </div>
-                <div class="text-3xl font-bold text-gray-800 mb-2">185</div>
+                <div class="text-3xl font-bold text-gray-800 mb-2">{{ $customerStats['total_customers'] }}</div>
                 <p class="text-sm text-gray-600">
-                    <span class="text-blue-600 font-medium">92%</span> nasabah aktif
+                    <span class="text-blue-600 font-medium">{{ $customerStats['active_customers_percentage'] }}%</span> nasabah aktif
                 </p>
             </div>
         </div>
@@ -177,51 +207,45 @@
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Aktivitas Terbaru</h2>
         <div class="bg-white rounded-xl shadow-sm border border-gray-200">
             <div class="p-6">
-                <div class="space-y-4">
-                    <div class="flex items-center space-x-4">
-                        <div class="bg-green-100 p-2 rounded-full">
-                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">Nasabah baru: Ahmad Rizki</p>
-                            <p class="text-sm text-gray-500">5 menit yang lalu</p>
-                        </div>
+                @if($recentActivities->count() > 0)
+                    <div class="space-y-4">
+                        @foreach($recentActivities as $activity)
+                            <div class="flex items-center space-x-4">
+                                <div class="{{ $activity['icon_class'] }} p-2 rounded-full">
+                                    @if($activity['type'] == 'new_customer')
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                        </svg>
+                                    @elseif($activity['type'] == 'loan_approved')
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                            </path>
+                                        </svg>
+                                    @elseif($activity['type'] == 'payment_received')
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    @endif
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">{{ $activity['title'] }}</p>
+                                    <p class="text-sm text-gray-500">{{ $activity['time'] }}</p>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
-
-                    <div class="flex items-center space-x-4">
-                        <div class="bg-blue-100 p-2 rounded-full">
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                </path>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">Pinjaman disetujui: Rp 2.5jt - Siti Aminah</p>
-                            <p class="text-sm text-gray-500">15 menit yang lalu</p>
-                        </div>
+                @else
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        <p class="text-gray-500">Belum ada aktivitas terbaru</p>
                     </div>
-
-                    <div class="flex items-center space-x-4">
-                        <div class="bg-purple-100 p-2 rounded-full">
-                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900">Pembayaran diterima: Rp 500rb - Budi Santoso
-                            </p>
-                            <p class="text-sm text-gray-500">1 jam yang lalu</p>
-                        </div>
-                    </div>
-                </div>
+                @endif
             </div>
         </div>
     </div>
