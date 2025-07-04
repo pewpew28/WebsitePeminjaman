@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\LoanRepository;
+use App\Models\CollectorTask;
 use Illuminate\Support\Facades\Log;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class LoanService
 
     public function __construct(
         LoanRepository $loanRepository,
-        InstallmentService $installmentService
+        InstallmentService $installmentService,
     ) {
         $this->loanRepository = $loanRepository;
         $this->installmentService = $installmentService;
@@ -50,17 +51,18 @@ class LoanService
             
             // Create installments based on installment type
             $installmentType = $data['term_unit'] ?? 'daily'; // daily, weekly, monthly
+            $installments = null;
             
             switch ($installmentType) {
                 case 'weekly':
-                    $this->installmentService->createWeeklyInstallmentsForLoan($loan, $data);
+                    $installments = $this->installmentService->createWeeklyInstallmentsForLoan($loan, $data);
                     break;
                 case 'monthly':
-                    $this->installmentService->createMonthlyInstallmentsForLoan($loan, $data);
+                    $installments = $this->installmentService->createMonthlyInstallmentsForLoan($loan, $data);
                     break;
                 case 'daily':
                 default:
-                    $this->installmentService->createInstallmentsForLoan($loan, $data);
+                    $installments = $this->installmentService->createInstallmentsForLoan($loan, $data);
                     break;
             }
             
@@ -76,6 +78,10 @@ class LoanService
             throw new Exception('Failed to create loan');
         }
     }
+
+    /**
+     * Create collector tasks for installments
+     */
 
     public function updateLoan(int $id, array $data)
     {

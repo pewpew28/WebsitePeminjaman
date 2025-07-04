@@ -7,11 +7,27 @@ use App\Http\Controllers\Admin\NasabahController;
 use App\Http\Controllers\Admin\LoanController;
 use App\Http\Controllers\Admin\InstallmentController;
 use App\Http\Controllers\Admin\CollectorTaskController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\AdminController;
 
 Route::get('/', function () {
-    return redirect()->route('login');
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+
+    switch (auth()->user()->role) {
+        case 'admin':
+            return redirect()->intended(route('admin.dashboard'));
+        case 'finance':
+            return redirect()->intended(route('finance.dashboard'));
+        case 'collector':
+            return redirect()->intended(route('collector.dashboard'));
+        case 'nasabah':
+            return redirect()->intended(route('nasabah.dashboard'));
+        default:
+            abort(403, 'Unauthorized');
+    }
 });
 
 // ==================
@@ -61,30 +77,11 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('loans/{id}', [LoanController::class, 'destroy'])->name('loans.destroy');
         Route::post('loans/{id}/restore', [LoanController::class, 'restore'])->name('loans.restore');
         Route::post('loans/{id}/approve', [LoanController::class, 'approve'])->name('loans.approve');
-
-        // Installment Routes
-        Route::get('installments', [InstallmentController::class, 'index'])->name('installments.index');
-        Route::get('installments/create', [InstallmentController::class, 'create'])->name('installments.create');
-        Route::post('installments', [InstallmentController::class, 'store'])->name('installments.store');
-        Route::get('installments/{id}', [InstallmentController::class, 'show'])->name('installments.show');
-        Route::get('installments/{id}/edit', [InstallmentController::class, 'edit'])->name('installments.edit');
-        Route::put('installments/{id}', [InstallmentController::class, 'update'])->name('installments.update');
-        Route::delete('installments/{id}', [InstallmentController::class, 'destroy'])->name('installments.destroy');
-        Route::post('installments/{id}/restore', [InstallmentController::class, 'restore'])->name('installments.restore');
-        Route::post('installments/{id}/record-payment', [InstallmentController::class, 'recordPayment'])->name('installments.record-payment');
-        Route::post('installments/{id}/upload-payment-proof', [InstallmentController::class, 'uploadPaymentProof'])->name('installments.upload-payment-proof');
-
-        // Collector Task Routes
-        Route::get('collector-tasks', [CollectorTaskController::class, 'index'])->name('collector-tasks.index');
-        Route::get('collector-tasks/create', [CollectorTaskController::class, 'create'])->name('collector-tasks.create');
-        Route::post('collector-tasks', [CollectorTaskController::class, 'store'])->name('collector-tasks.store');
-        Route::get('collector-tasks/{id}', [CollectorTaskController::class, 'show'])->name('collector-tasks.show');
-        Route::get('collector-tasks/{id}/edit', [CollectorTaskController::class, 'edit'])->name('collector-tasks.edit');
-        Route::put('collector-tasks/{id}', [CollectorTaskController::class, 'update'])->name('collector-tasks.update');
-        Route::delete('collector-tasks/{id}', [CollectorTaskController::class, 'destroy'])->name('collector-tasks.destroy');
-        Route::post('collector-tasks/{id}/restore', [CollectorTaskController::class, 'restore'])->name('collector-tasks.restore');
-        Route::post('collector-tasks/{id}/record-collection', [CollectorTaskController::class, 'recordCollection'])->name('collector-tasks.record-collection');
-
+        // Payment Route
+        Route::get('payment', [PaymentController::class, 'form'])->name('payment.form');
+        Route::post('payment/store', [PaymentController::class, 'store'])->name('payment.store');
+        Route::get('/payment/history/{nasabah}', [PaymentController::class, 'history'])->name('admin.payment.history');
+        Route::get('/payment/receipt/{installment}', [PaymentController::class, 'receipt'])->name('admin.payment.receipt');
         // Setting Routes
         Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
         Route::get('settings/create', [SettingController::class, 'create'])->name('settings.create');
@@ -119,4 +116,4 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

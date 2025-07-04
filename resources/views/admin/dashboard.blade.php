@@ -9,7 +9,7 @@
                     <div>
                         <p class="text-sm font-medium text-gray-600">Total Pinjaman Aktif</p>
                         <p class="text-2xl font-bold text-blue-600">
-                            Rp {{ number_format($financialSummary['total_active_loans'] / 1000000, 1) }}M
+                            Rp {{ number_format($financialSummary['total_active_loans'] , 1) }}
                         </p>
                     </div>
                     <div class="bg-blue-100 p-3 rounded-full">
@@ -28,7 +28,7 @@
                     <div>
                         <p class="text-sm font-medium text-gray-600">Total Pembayaran Diterima</p>
                         <p class="text-2xl font-bold text-green-600">
-                            Rp {{ number_format($financialSummary['total_payments_received'] / 1000000, 1) }}M
+                            Rp {{ number_format($financialSummary['total_payments_received'] , 1) }}
                         </p>
                     </div>
                     <div class="bg-green-100 p-3 rounded-full">
@@ -47,9 +47,9 @@
                         <p class="text-sm font-medium text-gray-600">Tunggakan</p>
                         <p class="text-2xl font-bold text-red-600">
                             @if($financialSummary['total_overdue'] >= 1000000)
-                                Rp {{ number_format($financialSummary['total_overdue'] / 1000000, 1) }}M
+                                Rp {{ number_format($financialSummary['total_overdue'] , 1) }}
                             @else
-                                Rp {{ number_format($financialSummary['total_overdue'] / 1000, 0) }}K
+                                Rp {{ number_format($financialSummary['total_overdue'] , 0) }}
                             @endif
                         </p>
                     </div>
@@ -69,7 +69,7 @@
                     <div>
                         <p class="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
                         <p class="text-2xl font-bold text-purple-600">
-                            Rp {{ number_format($financialSummary['monthly_income'] / 1000, 0) }}K
+                            Rp {{ number_format($financialSummary['monthly_income'], 0) }}
                         </p>
                     </div>
                     <div class="bg-purple-100 p-3 rounded-full">

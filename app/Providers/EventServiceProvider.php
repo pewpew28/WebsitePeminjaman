@@ -20,9 +20,6 @@ class EventServiceProvider extends ServiceProvider
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
-        UserActivityDetected::class => [ // Daftarkan event Anda
-            UpdateUserLastSeenAt::class, // Kaitkan dengan listener Anda
-        ],
     ];
 
     /**

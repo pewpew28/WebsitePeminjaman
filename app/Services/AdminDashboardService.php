@@ -53,7 +53,7 @@ class AdminDashboardService
     private function getTotalPaymentsReceived(): float
     {
         $currentMonth = Carbon::now();
-        
+
         return Installment::where('status', 'paid')
             ->whereMonth('payment_date', $currentMonth->month)
             ->whereYear('payment_date', $currentMonth->year)
@@ -62,15 +62,18 @@ class AdminDashboardService
 
     private function getTotalOverdue(): float
     {
-        return Loan::whereIn('status', ['active', 'disbursed'])
-            ->where('end_date', '<', Carbon::now())
-            ->sum('remaining_principal');
+        return Installment::whereHas('loan', function ($query) {
+            $query->whereIn('status', ['active', 'disbursed']);
+        })
+            ->where('due_date', '<=', now())
+            ->where('status', '!=', 'paid')
+            ->sum('total_due_amount');
     }
 
     private function getMonthlyIncome(): float
     {
         $currentMonth = Carbon::now();
-        
+
         return Installment::where('status', 'paid')
             ->whereMonth('payment_date', $currentMonth->month)
             ->whereYear('payment_date', $currentMonth->year)
@@ -80,7 +83,7 @@ class AdminDashboardService
     private function getNewCustomersThisMonth(): int
     {
         $currentMonth = Carbon::now();
-        
+
         return Nasabah::whereMonth('created_at', $currentMonth->month)
             ->whereYear('created_at', $currentMonth->year)
             ->count();
@@ -97,7 +100,7 @@ class AdminDashboardService
     private function getNewLoansThisMonth(): int
     {
         $currentMonth = Carbon::now();
-        
+
         return Loan::whereMonth('created_at', $currentMonth->month)
             ->whereYear('created_at', $currentMonth->year)
             ->count();
@@ -119,7 +122,7 @@ class AdminDashboardService
     private function getActiveCustomersPercentage(): int
     {
         $totalCustomers = $this->getTotalCustomers();
-        
+
         if ($totalCustomers === 0) {
             return 0;
         }

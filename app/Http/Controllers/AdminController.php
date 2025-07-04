@@ -38,6 +38,7 @@ class AdminController extends Controller
                 'recentActivities' => $this->dashboardService->getRecentActivities(),
             ];
         });
+        // dd($dashboardData['financialSummary']);
 
         return view('admin.dashboard', $dashboardData);
     }
