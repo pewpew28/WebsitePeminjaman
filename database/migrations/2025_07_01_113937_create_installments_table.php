@@ -21,6 +21,7 @@ return new class extends Migration
             $table->decimal('fine_amount', 15, 2)->default(0.00)->comment('Jumlah denda yang dikenakan pada cicilan ini');
             $table->decimal('total_due_amount', 15, 2)->comment('Total jumlah yang harus dibayar (pokok + bunga + denda)');
             $table->decimal('amount_paid', 15, 2)->default(0.00)->comment('Jumlah yang sudah dibayar untuk cicilan ini');
+            $table->decimal('remaining_amount', 15, 2)->default(0)->comment('sisa Pembayaran');
             $table->dateTime('payment_date')->nullable()->comment('Tanggal dan waktu pembayaran dilakukan');
             $table->string('status')->default('unpaid')->comment('Status cicilan (unpaid, paid, partially_paid, overdue)');
             $table->foreignId('paid_by_user_id')->nullable()->constrained('users')->onDelete('set null')->comment('User (Collector/Finance) yang menerima pembayaran');

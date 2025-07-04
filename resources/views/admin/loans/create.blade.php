@@ -15,20 +15,31 @@
             <div class="mb-8">
                 <h2 class="text-lg font-semibold text-gray-700 mb-4">Basic Loan Information</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="nasabah_id" class="block text-sm font-medium text-gray-700">Nasabah <span
+                    <div class="relative">
+                        <label for="nasabah_search" class="block text-sm font-medium text-gray-700">Nasabah <span
                                 class="text-red-500">*</span></label>
-                        <select name="nasabah_id" id="nasabah_id"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('nasabah_id') border-red-500 @enderror">
+                        <input type="text" id="nasabah_search" placeholder="Cari nama nasabah..."
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('nasabah_id') border-red-500 @enderror"
+                            autocomplete="off">
+
+                        <!-- Hidden select for form submission -->
+                        <select name="nasabah_id" id="nasabah_id" class="hidden">
                             <option value="">Select Nasabah</option>
                             @foreach (\App\Models\Nasabah::whereDoesntHave('loans', function ($query) {
-                                $query->where('status', 'active');
-                            })->get() as $nasabah)
+        $query->where('status', 'active');
+    })->get() as $nasabah)
                                 <option value="{{ $nasabah->id }}"
                                     {{ old('nasabah_id') == $nasabah->id ? 'selected' : '' }}>{{ $nasabah->name }}
                                 </option>
                             @endforeach
                         </select>
+
+                        <!-- Dropdown suggestions -->
+                        <div id="nasabah_dropdown"
+                            class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden">
+                            <!-- Options will be populated by JavaScript -->
+                        </div>
+
                         @error('nasabah_id')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -48,8 +59,8 @@
                     <div>
                         <label for="interest_rate" class="block text-sm font-medium text-gray-700">Interest Rate (%)
                             <span class="text-red-500">*</span></label>
-                        <input type="number" step="0.01" name="interest_rate" id="interest_rate"
-                            value="{{ old('interest_rate') }}"
+                        <input type="number" step="0.01" name="interest_rate" id="interest_rate" value="40"
+                            readonly
                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('interest_rate') border-red-500 @enderror"
                             oninput="calculateLoan()">
                         @error('interest_rate')
@@ -275,13 +286,169 @@
     </div>
 
     <script>
+        // Initialize nasabah options array
+        let nasabahOptions = [];
+
         // Set today's date on page load
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('start_date').value = today;
             document.getElementById('disbursement_date').value = today;
+
+            // Initialize nasabah options from select element
+            const nasabahSelect = document.getElementById('nasabah_id');
+            nasabahOptions = Array.from(nasabahSelect.options).map(option => ({
+                value: option.value,
+                text: option.textContent
+            })).filter(option => option.value !== '');
+
+            // Set up search functionality
+            setupNasabahSearch();
+
+            // Auto-select nasabah from URL parameter
+            autoSelectNasabahFromURL();
+
             calculateLoan();
         });
+
+        function autoSelectNasabahFromURL() {
+            // Get URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const nasabahId = urlParams.get('nasabah_id');
+
+            if (nasabahId) {
+                // Find the nasabah option with matching ID
+                const selectedNasabah = nasabahOptions.find(option => option.value === nasabahId);
+
+                if (selectedNasabah) {
+                    // Set the hidden select value
+                    document.getElementById('nasabah_id').value = selectedNasabah.value;
+
+                    // Set the search input value to show the selected nasabah name
+                    document.getElementById('nasabah_search').value = selectedNasabah.text;
+
+                    // Optional: Add visual feedback that nasabah was auto-selected
+                    const searchInput = document.getElementById('nasabah_search');
+                    searchInput.style.backgroundColor = '#dcfce7'; // Light green background
+                    searchInput.style.borderColor = '#22c55e'; // Green border
+
+                    // Remove the visual feedback after 2 seconds
+                    setTimeout(() => {
+                        searchInput.style.backgroundColor = '';
+                        searchInput.style.borderColor = '';
+                    }, 2000);
+                }
+            }
+        }
+
+        function setupNasabahSearch() {
+            const searchInput = document.getElementById('nasabah_search');
+            const dropdown = document.getElementById('nasabah_dropdown');
+            const hiddenSelect = document.getElementById('nasabah_id');
+
+            // Show dropdown when input is focused
+            searchInput.addEventListener('focus', function() {
+                showDropdown();
+            });
+
+            // Filter options as user types
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                filterNasabahOptions(searchTerm);
+            });
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('#nasabah_search') && !event.target.closest('#nasabah_dropdown')) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            // Handle keyboard navigation
+            searchInput.addEventListener('keydown', function(event) {
+                const options = dropdown.querySelectorAll('.dropdown-option');
+                const activeOption = dropdown.querySelector('.dropdown-option.active');
+
+                if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (activeOption) {
+                        activeOption.classList.remove('active');
+                        const nextOption = activeOption.nextElementSibling;
+                        if (nextOption) {
+                            nextOption.classList.add('active');
+                        } else {
+                            options[0]?.classList.add('active');
+                        }
+                    } else {
+                        options[0]?.classList.add('active');
+                    }
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (activeOption) {
+                        activeOption.classList.remove('active');
+                        const prevOption = activeOption.previousElementSibling;
+                        if (prevOption) {
+                            prevOption.classList.add('active');
+                        } else {
+                            options[options.length - 1]?.classList.add('active');
+                        }
+                    } else {
+                        options[options.length - 1]?.classList.add('active');
+                    }
+                } else if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (activeOption) {
+                        selectNasabah(activeOption.dataset.value, activeOption.textContent);
+                    }
+                } else if (event.key === 'Escape') {
+                    dropdown.classList.add('hidden');
+                }
+            });
+        }
+
+        function showDropdown() {
+            filterNasabahOptions('');
+        }
+
+        function filterNasabahOptions(searchTerm) {
+            const dropdown = document.getElementById('nasabah_dropdown');
+
+            const filteredOptions = nasabahOptions.filter(option =>
+                option.text.toLowerCase().includes(searchTerm)
+            );
+
+            dropdown.innerHTML = '';
+
+            if (filteredOptions.length === 0) {
+                dropdown.innerHTML = '<div class="px-4 py-2 text-gray-500">Tidak ada nasabah ditemukan</div>';
+            } else {
+                filteredOptions.forEach(option => {
+                    const optionElement = document.createElement('div');
+                    optionElement.className =
+                        'dropdown-option px-4 py-2 cursor-pointer hover:bg-blue-50 hover:text-blue-600';
+                    optionElement.textContent = option.text;
+                    optionElement.dataset.value = option.value;
+
+                    optionElement.addEventListener('click', function() {
+                        selectNasabah(option.value, option.text);
+                    });
+
+                    dropdown.appendChild(optionElement);
+                });
+            }
+
+            dropdown.classList.remove('hidden');
+        }
+
+        function selectNasabah(value, text) {
+            document.getElementById('nasabah_search').value = text;
+            document.getElementById('nasabah_id').value = value;
+            document.getElementById('nasabah_dropdown').classList.add('hidden');
+
+            // Remove active class from all options
+            const options = document.querySelectorAll('.dropdown-option');
+            options.forEach(option => option.classList.remove('active'));
+        }
 
         function calculateLoan() {
             const loanAmount = parseFloat(document.getElementById('loan_amount').value) || 0;
@@ -350,4 +517,11 @@
         // Add event listeners to recalculate when start date changes
         document.getElementById('start_date').addEventListener('change', calculateLoan);
     </script>
+
+    <style>
+        .dropdown-option.active {
+            background-color: #dbeafe;
+            color: #2563eb;
+        }
+    </style>
 </x-admin-layout>

@@ -35,9 +35,9 @@
 
     <!-- Pembayaran -->
     <x-admin.nav-item 
-        href="" 
+        href="{{ route('admin.payment.form') }}" 
         icon="fas fa-credit-card"
-        :active="request()->routeIs('admin.pembayaran.*')">
+        :active="request()->routeIs('admin.payment.*')">
         Pembayaran
     </x-admin.nav-item>
 
