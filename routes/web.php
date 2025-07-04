@@ -1,12 +1,11 @@
 <?php
 
+use App\Http\Controllers\Collector\CollectorController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\NasabahController;
 use App\Http\Controllers\Admin\LoanController;
-use App\Http\Controllers\Admin\InstallmentController;
-use App\Http\Controllers\Admin\CollectorTaskController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\AdminController;
@@ -103,9 +102,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Collector Routes
     Route::prefix('collector')->middleware('role:collector')->group(function () {
-        Route::get('/dashboard', function () {
-            return view('dashboard');
-        })->name('collector.dashboard');
+        Route::get('/dashboard', [CollectorController::class, 'index'])->name('collector.dashboard');
     });
 
     // Nasabah Routes
