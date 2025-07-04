@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CollectorTaskController;
 use App\Http\Controllers\Collector\CollectorController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
@@ -76,11 +77,28 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('loans/{id}', [LoanController::class, 'destroy'])->name('loans.destroy');
         Route::post('loans/{id}/restore', [LoanController::class, 'restore'])->name('loans.restore');
         Route::post('loans/{id}/approve', [LoanController::class, 'approve'])->name('loans.approve');
+
         // Payment Route
         Route::get('payment', [PaymentController::class, 'form'])->name('payment.form');
         Route::post('payment/store', [PaymentController::class, 'store'])->name('payment.store');
         Route::get('/payment/history/{nasabah}', [PaymentController::class, 'history'])->name('admin.payment.history');
         Route::get('/payment/receipt/{installment}', [PaymentController::class, 'receipt'])->name('admin.payment.receipt');
+
+        // CollectorTask Route
+        Route::resource('collector-tasks', CollectorTaskController::class)->parameters([
+            'collector-tasks' => 'collectorTask'
+        ]);
+        Route::get('collectors/{collector}/tasks', [CollectorTaskController::class, 'show'])
+            ->name('collector-tasks.show');
+        Route::get('collectors/{collector}/assign', [CollectorTaskController::class, 'assign'])
+            ->name('collector-tasks.assign');
+        Route::post('collectors/{collector}/assign', [CollectorTaskController::class, 'storeAssignment'])
+            ->name('collector-tasks.store-assignment');
+        Route::patch('collector-tasks/{collectorTask}/status', [CollectorTaskController::class, 'updateStatus'])
+            ->name('collector-tasks.update-status');
+        Route::get('api/collector-tasks/data', [CollectorTaskController::class, 'getTasksData'])
+            ->name('collector-tasks.data');
+            
         // Setting Routes
         Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
         Route::get('settings/create', [SettingController::class, 'create'])->name('settings.create');

@@ -41,6 +41,14 @@
         Pembayaran
     </x-admin.nav-item>
 
+    <!-- Collector Task -->
+    <x-admin.nav-item 
+        href="{{ url('/admin/collector-tasks') }}" 
+        icon="fas fa-credit-card"
+        :active="request()->routeIs('admin.collector.*')">
+        Tugas Pengutip
+    </x-admin.nav-item>
+
     <!-- Laporan -->
     <x-admin.nav-item 
         href="" 

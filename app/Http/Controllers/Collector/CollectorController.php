@@ -3,23 +3,15 @@
 namespace App\Http\Controllers\Collector;
 
 use App\Http\Controllers\Controller;
+use App\Models\CollectorTask;
 use App\Models\Nasabah;
+use Illuminate\Support\Facades\Auth;
 
 class CollectorController extends Controller
 {
     public function index(){
-        $nasabahs = Nasabah::with([
-            'loans' => function ($query) {
-                $query->where('status', 'active')
-                    ->orderBy('created_at', 'desc');
-            },
-            'loans.installments' => function ($query) {
-                $query->where('status', '!=', 'paid')
-                    ->orderBy('installment_number', 'asc');
-            }
-        ])->whereHas('loans', function ($query) {
-            $query->where('status', 'active');
-        })->orderBy('created_at', 'desc')->get();
-        return view('collector.dashboard', compact('nasabahs'));
+        $tasks = CollectorTask::where('collector_id', Auth::user()->id)->with(['nasabah', 'loan.installments'])->get();
+        dd($tasks);
+        return view('collector.dashboard', compact('tasks'));
     }
 }
