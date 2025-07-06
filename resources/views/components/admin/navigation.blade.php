@@ -35,7 +35,7 @@
 
     <!-- Pembayaran -->
     <x-admin.nav-item 
-        href="{{ route('admin.payment.form') }}" 
+        href="{{ route('admin.payment.index') }}" 
         icon="fas fa-credit-card"
         :active="request()->routeIs('admin.payment.*')">
         Pembayaran
@@ -44,7 +44,7 @@
     <!-- Collector Task -->
     <x-admin.nav-item 
         href="{{ url('/admin/collector-tasks') }}" 
-        icon="fas fa-credit-card"
+        icon="fas fa-tasks"
         :active="request()->routeIs('admin.collector.*')">
         Tugas Pengutip
     </x-admin.nav-item>

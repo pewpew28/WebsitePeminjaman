@@ -30,6 +30,7 @@ class Installment extends Model implements HasMedia
         'status',
         'paid_by_user_id',
         'payment_method',
+        'collector_id',
         'notes',
     ];
 

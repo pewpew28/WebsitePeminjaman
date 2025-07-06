@@ -27,6 +27,7 @@ return new class extends Migration
             $table->foreignId('paid_by_user_id')->nullable()->constrained('users')->onDelete('set null')->comment('User (Collector/Finance) yang menerima pembayaran');
             $table->string('payment_method')->nullable()->comment('Metode pembayaran (cash, transfer)');
             $table->text('notes')->nullable()->comment('Catatan pembayaran');
+            $table->foreignId('collector_id')->nullable()->constrained('users')->onDelete('cascade');
             // Untuk bukti pembayaran (foto/transfer), akan menggunakan Spatie MediaLibrary
             // yang akan berelasi secara polimorfik dengan model Installment.
             $table->timestamps();

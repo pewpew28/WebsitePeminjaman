@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CollectorTask;
 use App\Models\Installment;
 use App\Models\Loan;
 use App\Models\Nasabah;
@@ -104,7 +105,7 @@ class PaymentController extends Controller
                 throw new \Exception('Jumlah pembayaran melebihi total yang harus dibayar');
             }
 
-            // Proses pembayaran
+            // Proses pembayaran dengan user yang login
             $paymentResult = $this->processPaymentImproved($installments, $validated);
 
             // Update loan statistics
@@ -112,6 +113,9 @@ class PaymentController extends Controller
 
             // Log payment transaction
             $this->logPaymentTransaction($validated['loan_id'], $paymentResult, $validated);
+
+            // Update CollectorTask status untuk installments yang telah dibayar lunas
+            $this->updateCollectorTasksStatus($validated['installment_ids'], $validated['payment_amount']);
 
             DB::commit();
 
@@ -130,13 +134,114 @@ class PaymentController extends Controller
                 'error' => $e->getMessage(),
                 'loan_id' => $validated['loan_id'],
                 'payment_amount' => $validated['payment_amount'],
-                'installment_ids' => $validated['installment_ids']
+                'installment_ids' => $validated['installment_ids'],
+                'processed_by' => Auth::id() // Tambahkan user yang memproses
             ]);
 
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'Gagal memproses pembayaran: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Update CollectorTask status untuk installments yang telah dibayar
+     */
+    private function updateCollectorTasksStatus(array $installmentIds, float $paymentAmount)
+{
+    $currentUserId = Auth::id(); // Ambil user yang sedang login
+    
+    // Ambil semua CollectorTask yang terkait dengan installments yang dibayar
+    $collectorTasks = CollectorTask::whereIn('installment_id', $installmentIds)
+        ->whereIn('status', ['pending', 'in_progress', 'assigned', 'active'])
+        ->get();
+
+    if ($collectorTasks->isEmpty()) {
+        return;
+    }
+
+    // Hitung distribusi pembayaran per installment
+    $installments = Installment::whereIn('id', $installmentIds)->get();
+    $paymentDistribution = $this->calculatePaymentDistribution($installments, $paymentAmount);
+
+    // Hapus CollectorTask berdasarkan installment yang dibayar
+    foreach ($collectorTasks as $task) {
+        // Cek status installment terkait setelah pembayaran
+        $installment = Installment::find($task->installment_id);
+
+        if ($installment) {
+            // Ambil jumlah yang dibayar untuk installment ini
+            $amountPaidForThisInstallment = $paymentDistribution[$installment->id] ?? 0;
+
+            if ($installment->status === 'paid') {
+                // Jika installment sudah lunas, hapus task
+                Log::info('CollectorTask will be deleted due to full payment', [
+                    'task_id' => $task->id,
+                    'installment_id' => $task->installment_id,
+                    'collector_id' => $task->collector_id,
+                    'payment_amount' => $amountPaidForThisInstallment,
+                    'installment_status' => $installment->status,
+                    'paid_by_user_id' => $currentUserId,
+                    'payment_made_by' => 'admin/finance'
+                ]);
+
+                // Hapus CollectorTask
+                $task->delete();
+
+                Log::info('CollectorTask deleted successfully', [
+                    'deleted_task_id' => $task->id,
+                    'installment_id' => $task->installment_id,
+                    'reason' => 'Installment fully paid by admin/finance',
+                    'paid_by_user_id' => $currentUserId
+                ]);
+            } else {
+                // Jika pembayaran partial, biarkan task tetap ada
+                Log::info('CollectorTask kept active due to partial payment', [
+                    'task_id' => $task->id,
+                    'installment_id' => $task->installment_id,
+                    'collector_id' => $task->collector_id,
+                    'partial_payment' => $amountPaidForThisInstallment,
+                    'installment_status' => $installment->status,
+                    'paid_by_user_id' => $currentUserId,
+                    'payment_made_by' => 'admin/finance'
+                ]);
+            }
+        }
+    }
+}
+
+    /**
+     * Hitung distribusi pembayaran per installment
+     */
+    private function calculatePaymentDistribution($installments, float $totalPayment): array
+    {
+        $distribution = [];
+        $remainingPayment = $totalPayment;
+
+        // Urutkan installments berdasarkan nomor cicilan (prioritas pembayaran)
+        $sortedInstallments = collect($installments)->sortBy('installment_number');
+
+        foreach ($sortedInstallments as $installment) {
+            if ($remainingPayment <= 0) {
+                $distribution[$installment->id] = 0;
+                continue;
+            }
+
+            // Hitung sisa yang harus dibayar untuk installment ini
+            $remainingAmount = $installment->total_due_amount - ($installment->amount_paid ?? 0);
+
+            if ($remainingPayment >= $remainingAmount) {
+                // Bayar lunas installment ini
+                $distribution[$installment->id] = $remainingAmount;
+                $remainingPayment -= $remainingAmount;
+            } else {
+                // Bayar sebagian dari installment ini
+                $distribution[$installment->id] = $remainingPayment;
+                $remainingPayment = 0;
+            }
+        }
+
+        return $distribution;
     }
 
     /**
@@ -173,6 +278,7 @@ class PaymentController extends Controller
         $processedCount = 0;
         $fullyPaidCount = 0;
         $paymentDetails = [];
+        $currentUserId = Auth::id(); // Ambil user yang sedang login
 
         foreach ($installments as $installment) {
             if ($remainingPayment <= 0) break;
@@ -192,13 +298,12 @@ class PaymentController extends Controller
             $oldAmountPaid = $installment->amount_paid ?? 0;
             $newAmountPaid = $oldAmountPaid + $amountToPay;
 
-            // Update pembayaran
+            // Update pembayaran dengan user yang sedang login
             $installment->updatePayment(
                 $newAmountPaid,
                 $validated['payment_method'] ?? 'cash',
-                Auth::id()
+                $currentUserId // Pastikan menggunakan user yang sedang login
             );
-
 
             // Catat detail pembayaran
             $paymentDetails[] = [
@@ -208,7 +313,8 @@ class PaymentController extends Controller
                 'old_amount_paid' => $oldAmountPaid,
                 'new_amount_paid' => $newAmountPaid,
                 'remaining_after_payment' => $installment->remaining_amount,
-                'is_fully_paid' => $installment->status === 'paid'
+                'is_fully_paid' => $installment->status === 'paid',
+                'paid_by_user_id' => $currentUserId // Tambahkan informasi user
             ];
 
             // Update counters
@@ -230,7 +336,8 @@ class PaymentController extends Controller
             Log::warning('Overpayment detected', [
                 'loan_id' => $validated['loan_id'],
                 'overpayment_amount' => $remainingPayment,
-                'total_payment' => $validated['payment_amount']
+                'total_payment' => $validated['payment_amount'],
+                'processed_by' => $currentUserId
             ]);
         }
 
@@ -238,7 +345,8 @@ class PaymentController extends Controller
             'processed_count' => $processedCount,
             'fully_paid_count' => $fullyPaidCount,
             'payment_details' => $paymentDetails,
-            'overpayment' => $remainingPayment
+            'overpayment' => $remainingPayment,
+            'processed_by' => $currentUserId
         ];
     }
 
@@ -347,6 +455,7 @@ class PaymentController extends Controller
     private function logPaymentTransaction($loanId, $paymentResult, $validated)
     {
         $loan = Loan::find($loanId);
+        $currentUserId = Auth::id();
 
         activity()
             ->on($loan)
@@ -357,8 +466,9 @@ class PaymentController extends Controller
                 'fully_paid_installments' => $paymentResult['fully_paid_count'],
                 'overpayment' => $paymentResult['overpayment'],
                 'payment_details' => $paymentResult['payment_details'],
-                'processed_by' => Auth::id(),
-                'processed_at' => now()
+                'processed_by' => $currentUserId,
+                'processed_at' => now(),
+                'user_name' => Auth::user()->name ?? 'Unknown User' // Tambahkan nama user
             ])
             ->log('loan_payment_processed');
     }
@@ -368,13 +478,16 @@ class PaymentController extends Controller
      */
     private function logPayment($installment, $amountPaid, $validated)
     {
+        $currentUserId = Auth::id();
+
         activity()
             ->on($installment)
             ->withProperties([
                 'amount_paid' => $amountPaid,
                 'payment_method' => $validated['payment_method'] ?? 'cash',
                 'remaining_amount' => $installment->remaining_amount,
-                'processed_by' => Auth::id(),
+                'processed_by' => $currentUserId,
+                'user_name' => Auth::user()->name ?? 'Unknown User' // Tambahkan nama user
             ])
             ->log('installment_payment_made');
     }
@@ -574,6 +687,8 @@ class PaymentController extends Controller
             'payment_method' => 'nullable|string|max:50',
         ]);
 
+        $currentUserId = Auth::id(); // Ambil user yang sedang login
+
         DB::beginTransaction();
 
         try {
@@ -586,10 +701,11 @@ class PaymentController extends Controller
                 if ($installment && $installment->status !== 'paid') {
                     $newAmountPaid = ($installment->amount_paid ?? 0) + $payment['amount'];
 
+                    // Pastikan menggunakan user yang sedang login
                     $installment->updatePayment(
                         $newAmountPaid,
                         $validated['payment_method'] ?? 'cash',
-                        Auth::id()
+                        $currentUserId
                     );
 
                     $this->logPayment($installment, $payment['amount'], $validated);
@@ -610,14 +726,17 @@ class PaymentController extends Controller
                     'Berhasil memproses %d pembayaran dengan total Rp %s',
                     $processedCount,
                     number_format($totalAmount, 2)
-                )
+                ),
+                'processed_by' => $currentUserId,
+                'processed_by_name' => Auth::user()->name ?? 'Unknown User'
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             Log::error('Bulk payment processing failed', [
                 'error' => $e->getMessage(),
-                'payments' => $validated['payments']
+                'payments' => $validated['payments'],
+                'processed_by' => $currentUserId
             ]);
 
             return response()->json([

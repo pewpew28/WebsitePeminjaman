@@ -218,6 +218,9 @@
                                         <span class="text-green-600 font-medium">
                                             Paid: Rp {{ number_format($installment->amount_paid, 0, ',', '.') }}
                                         </span>
+                                        <span class="text-green-600 font-medium">
+                                            Paid By {{ $installment->payer->name }}
+                                        </span>
                                         @if ($installment->remaining_amount > 0)
                                             <span class="text-orange-600 font-medium ml-3">
                                                 Remaining: Rp

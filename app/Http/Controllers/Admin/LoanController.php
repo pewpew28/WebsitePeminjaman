@@ -6,11 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Loan\StoreLoanRequest;
 use App\Http\Requests\Loan\UpdateLoanRequest;
 use App\Http\Requests\Loan\ApproveLoanRequest;
+use App\Models\CollectorTask;
+use App\Models\Loan;
+use App\Models\User;
 use App\Services\LoanService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 
 class LoanController extends Controller
 {
@@ -105,6 +110,118 @@ class LoanController extends Controller
             return redirect()->route('admin.loans.index')->with('success', 'Loan approved successfully');
         } catch (Exception $e) {
             return back()->with('error', 'Failed to approve loan: ' . $e->getMessage());
+        }
+    }
+
+    public function assignment($id)
+    {
+        $collector = User::where('role', 'collector')->get();
+        return $collector;
+    }
+    public function assignmentStore(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'collector_id' => 'required|exists:users,id',
+                'old_collector_id' => 'nullable|exists:users,id',
+                'new_collector_id' => 'nullable|exists:users,id',
+            ]);
+
+            $loan = Loan::with([
+                'installments' => fn($q) => $q->where('status', '!=', 'paid'),
+                'nasabah'
+            ])->findOrFail($id);
+
+            // Determine the target collector ID
+            $targetCollectorId = $request->new_collector_id ?? $request->collector_id;
+
+            // Check if collector role is valid
+            $collector = User::where('id', $targetCollectorId)
+                ->where('role', 'collector')
+                ->firstOrFail();
+
+            // Handle reassignment scenario
+            if (
+                $request->old_collector_id && $request->new_collector_id &&
+                $request->old_collector_id !== $request->new_collector_id
+            ) {
+
+                // Update existing tasks for the old collector
+                CollectorTask::where('collector_id', $request->old_collector_id)
+                    ->whereIn('installment_id', $loan->installments->pluck('id'))
+                    ->where('status', 'active') // Only update pending tasks
+                    ->update([
+                        'collector_id' => $request->new_collector_id,
+                        'assigned_date' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                // Update installments collector_id
+                foreach ($loan->installments as $installment) {
+                    $installment->update([
+                        'collector_id' => $request->new_collector_id
+                    ]);
+                }
+
+                // Update loan with new collector assignment
+                $loan->update([
+                    'collector_id' => $request->new_collector_id,
+                ]);
+
+                $message = 'Loan successfully reassigned from previous collector to ' . $collector->name;
+            } else {
+                // Normal assignment (new assignment)
+                // Update loan with collector assignment
+                $loan->update([
+                    'collector_id' => $targetCollectorId,
+                ]);
+
+                // Create new tasks for each unpaid installment
+                foreach ($loan->installments as $installment) {
+                    // Check if task already exists to avoid duplicates
+                    $existingTask = CollectorTask::where('collector_id', $targetCollectorId)
+                        ->where('installment_id', $installment->id)
+                        ->first();
+
+                    if (!$existingTask) {
+                        CollectorTask::create([
+                            'collector_id' => $targetCollectorId,
+                            'nasabah_id' => $loan->nasabah->id,
+                            'installment_id' => $installment->id,
+                            'assigned_date' => now(),
+                            'due_date' => $installment->due_date,
+                            'status' => 'active',
+                        ]);
+                    }
+
+                    $installment->update([
+                        'collector_id' => $targetCollectorId
+                    ]);
+                }
+
+                $message = 'Loan successfully assigned to ' . $collector->name;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Loan or collector not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to assign loan: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

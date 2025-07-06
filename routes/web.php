@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\LoanController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Collector\CollectorPaymentController;
 
 Route::get('/', function () {
     if (!auth()->check()) {
@@ -77,9 +78,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('loans/{id}', [LoanController::class, 'destroy'])->name('loans.destroy');
         Route::post('loans/{id}/restore', [LoanController::class, 'restore'])->name('loans.restore');
         Route::post('loans/{id}/approve', [LoanController::class, 'approve'])->name('loans.approve');
+        Route::get('loans/{id}/assign', [LoanController::class, 'assignment'])->name('loans.asign');
+        Route::post('loans/{id}/assign', [LoanController::class, 'assignmentStore'])->name('loans.asign.store');
 
         // Payment Route
-        Route::get('payment', [PaymentController::class, 'form'])->name('payment.form');
+        Route::get('payment', [PaymentController::class, 'dashboard'])->name('payment.index');
+        Route::get('payment/form', [PaymentController::class, 'form'])->name('payment.form');
         Route::post('payment/store', [PaymentController::class, 'store'])->name('payment.store');
         Route::get('/payment/history/{nasabah}', [PaymentController::class, 'history'])->name('admin.payment.history');
         Route::get('/payment/receipt/{installment}', [PaymentController::class, 'receipt'])->name('admin.payment.receipt');
@@ -98,7 +102,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('collector-tasks.update-status');
         Route::get('api/collector-tasks/data', [CollectorTaskController::class, 'getTasksData'])
             ->name('collector-tasks.data');
-            
+
         // Setting Routes
         Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
         Route::get('settings/create', [SettingController::class, 'create'])->name('settings.create');
@@ -121,6 +125,8 @@ Route::middleware(['auth'])->group(function () {
     // Collector Routes
     Route::prefix('collector')->middleware('role:collector')->group(function () {
         Route::get('/dashboard', [CollectorController::class, 'index'])->name('collector.dashboard');
+        Route::post('/payment', [CollectorPaymentController::class, 'store'])->name('collector.payments.store');
+        Route::get('nasabah/{nasabahId}/detail', [CollectorController::class, 'dataNasabah'])->name('collector.nasabah.detail');
     });
 
     // Nasabah Routes

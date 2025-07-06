@@ -17,6 +17,7 @@ class Loan extends Model
 
     protected $fillable = [
         'nasabah_id',
+        'collector_id',
         'loan_amount',
         'interest_rate',
         'loan_term',
@@ -64,6 +65,10 @@ class Loan extends Model
         return $this->belongsTo(Nasabah::class);
     }
 
+    public function collector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collector_id');
+    }
     /**
      * Relasi: Pinjaman disetujui oleh satu User (Admin/Finance).
      */
@@ -96,12 +101,15 @@ class Loan extends Model
         return $this->hasMany(Loan::class, 'original_loan_id');
     }
 
-    /**
-     * Relasi: Pinjaman bisa memiliki banyak Tugas Collector terkait.
-     */
-    public function collectorTasks(): HasMany
+    public function checkAndMarkAsCompleted(): void
     {
-        return $this->hasMany(CollectorTask::class);
+        $hasUnpaid = $this->installments()
+            ->where('status', '!=', 'paid')
+            ->exists();
+
+        if (! $hasUnpaid) {
+            $this->update(['status' => 'completed']);
+        }
     }
 
     /**
