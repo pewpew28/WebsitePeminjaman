@@ -59,8 +59,7 @@
                     <div>
                         <label for="interest_rate" class="block text-sm font-medium text-gray-700">Interest Rate (%)
                             <span class="text-red-500">*</span></label>
-                        <input type="number" step="0.01" name="interest_rate" id="interest_rate" value="40"
-                            readonly
+                        <input type="number" step="0.01" name="interest_rate" id="interest_rate" value="{{ old('interest_rate') }}"
                             class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('interest_rate') border-red-500 @enderror"
                             oninput="calculateLoan()">
                         @error('interest_rate')
@@ -96,24 +95,12 @@
                         @enderror
                     </div>
 
-                    <div>
-                        <label for="status" class="block text-sm font-medium text-gray-700">Status <span
-                                class="text-red-500">*</span></label>
-                        <select name="status" id="status"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('status') border-red-500 @enderror">
-                            <option value="active" {{ old('status') == 'active' ? 'selected' : '' }}>Active</option>
-                            <option value="pending" {{ old('status') == 'pending' ? 'selected' : '' }}>Pending</option>
-                            <option value="completed" {{ old('status') == 'completed' ? 'selected' : '' }}>Completed
-                            </option>
-                        </select>
-                        @error('status')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <!-- Hidden status field with default pending -->
+                    <input type="hidden" name="status" value="pending">
                 </div>
             </div>
 
-            <!-- Date Information (Auto-calculated) -->
+            <!-- Date Information -->
             <div class="mb-8">
                 <h2 class="text-lg font-semibold text-gray-700 mb-4">Date Information</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -122,8 +109,8 @@
                                 class="text-red-500">*</span></label>
                         <input type="date" name="start_date" id="start_date"
                             value="{{ old('start_date', date('Y-m-d')) }}"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('start_date') border-red-500 @enderror bg-gray-50"
-                            readonly>
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('start_date') border-red-500 @enderror"
+                            onchange="calculateLoan()">
                         @error('start_date')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -205,28 +192,6 @@
                 </div>
             </div>
 
-            <!-- Approval Information -->
-            <div class="mb-8">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">Approval Information</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="approved_by" class="block text-sm font-medium text-gray-700">Approved By</label>
-                        <select name="approved_by" id="approved_by"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('approved_by') border-red-500 @enderror">
-                            <option value="">Select Approver</option>
-                            @foreach (\App\Models\User::whereIn('role', ['admin', 'finance'])->get() as $user)
-                                <option value="{{ $user->id }}"
-                                    {{ old('approved_by') == $user->id ? 'selected' : '' }}>{{ $user->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('approved_by')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-
             <!-- Payment Tracking (Auto-calculated, Hidden) -->
             <input type="hidden" name="total_principal_paid" id="total_principal_paid" value="0">
             <input type="hidden" name="total_interest_paid" id="total_interest_paid" value="0">
@@ -236,41 +201,12 @@
             <input type="hidden" name="remaining_interest" id="remaining_interest" value="0">
             <input type="hidden" name="remaining_fines" id="remaining_fines" value="0">
 
-            <!-- Refinancing Information -->
-            <div class="mb-8">
-                <h2 class="text-lg font-semibold text-gray-700 mb-4">Refinancing Information</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="is_refinanced" class="flex items-center">
-                            <input type="checkbox" name="is_refinanced" id="is_refinanced" value="1"
-                                {{ old('is_refinanced') ? 'checked' : '' }}
-                                class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <span class="text-sm font-medium text-gray-700">Is Refinanced</span>
-                        </label>
-                        @error('is_refinanced')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+            <!-- Hidden Approval Information (default null) -->
+            <input type="hidden" name="approved_by" value="">
 
-                    <div>
-                        <label for="original_loan_id" class="block text-sm font-medium text-gray-700">Original
-                            Loan</label>
-                        <select name="original_loan_id" id="original_loan_id"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 @error('original_loan_id') border-red-500 @enderror">
-                            <option value="">Select Original Loan</option>
-                            @foreach (\App\Models\Loan::all() as $loan)
-                                <option value="{{ $loan->id }}"
-                                    {{ old('original_loan_id') == $loan->id ? 'selected' : '' }}>
-                                    Loan #{{ $loan->id }} - {{ $loan->nasabah->name ?? 'Unknown' }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('original_loan_id')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                </div>
-            </div>
+            <!-- Hidden Refinancing Information (default null) -->
+            <input type="hidden" name="is_refinanced" value="0">
+            <input type="hidden" name="original_loan_id" value="">
 
             <div class="mt-6 border-t pt-6">
                 <button type="submit"
@@ -455,6 +391,10 @@
             const interestRate = parseFloat(document.getElementById('interest_rate').value) || 0;
             const loanTerm = parseInt(document.getElementById('loan_term').value) || 0;
             const termUnit = document.getElementById('term_unit').value;
+            const startDate = new Date(document.getElementById('start_date').value);
+
+            // Update disbursement date to match start date
+            document.getElementById('disbursement_date').value = document.getElementById('start_date').value;
 
             if (loanAmount > 0 && interestRate > 0 && loanTerm > 0) {
                 // Calculate interest amount (flat rate)
@@ -469,8 +409,7 @@
                 // Amount customer must repay (only principal, since interest paid upfront)
                 const repayAmount = loanAmount;
 
-                // Calculate end date based on term unit
-                const startDate = new Date(document.getElementById('start_date').value);
+                // Calculate end date based on start date + term unit
                 const endDate = new Date(startDate);
 
                 let daysToAdd = 0;
@@ -513,9 +452,6 @@
                 document.getElementById('repay_amount_display').textContent = 'Rp 0';
             }
         }
-
-        // Add event listeners to recalculate when start date changes
-        document.getElementById('start_date').addEventListener('change', calculateLoan);
     </script>
 
     <style>

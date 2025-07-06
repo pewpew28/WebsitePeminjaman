@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('loans', function (Blueprint $table) {
             $table->id();
             $table->foreignId('nasabah_id')->constrained('nasabahs')->onDelete('cascade')->comment('ID nasabah yang mengajukan pinjaman');
+            $table->foreignId('collector_id')->nullable()->constrained('users')->onDelete('cascade');
             $table->decimal('loan_amount', 15, 2)->comment('Jumlah pokok pinjaman');
             $table->decimal('interest_rate', 5, 4)->comment('Tingkat bunga per periode (misal: 0.05 untuk 5%)');
             $table->integer('loan_term')->comment('Jangka waktu pinjaman');

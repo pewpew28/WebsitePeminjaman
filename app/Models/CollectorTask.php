@@ -8,21 +8,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class CollectorTask extends Model
+class CollectorTask extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
     use LogsActivity;
     
     protected $fillable = [
         'collector_id',
         'nasabah_id',
-        'loan_id',
+        'installment_id',
         'assigned_date',
         'due_date',
         'status',
         'notes',
-        'visit_confirmation_qr_data',
         'actual_visit_date',
         'amount_collected_during_task',
     ];
@@ -53,11 +54,16 @@ class CollectorTask extends Model
     /**
      * Relasi: Tugas Collector bisa terkait dengan satu Pinjaman.
      */
-    public function loan(): BelongsTo
+    public function installment(): BelongsTo
     {
-        return $this->belongsTo(Loan::class);
+        return $this->belongsTo(Installment::class);
     }
 
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('bukti_bayar')
+            ->singleFile(); // Asumsi hanya satu gambar profil
+    }
     /**
      * Konfigurasi opsi logging untuk model CollectorTask.
      */

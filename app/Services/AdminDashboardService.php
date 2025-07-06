@@ -77,7 +77,7 @@ class AdminDashboardService
         return Installment::where('status', 'paid')
             ->whereMonth('payment_date', $currentMonth->month)
             ->whereYear('payment_date', $currentMonth->year)
-            ->sum('interest_amount');
+            ->sum('amount_paid');
     }
 
     private function getNewCustomersThisMonth(): int

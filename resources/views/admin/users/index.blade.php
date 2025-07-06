@@ -169,10 +169,10 @@
                                            title="Edit User">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <button class="text-yellow-600 hover:text-yellow-800 transition-colors duration-150" 
+                                        {{-- <button class="text-yellow-600 hover:text-yellow-800 transition-colors duration-150" 
                                                 title="Suspend User">
                                             <i class="fas fa-user-slash"></i>
-                                        </button>
+                                        </button> --}}
                                         <form action="{{ route('admin.users.destroy', $user->id) }}" 
                                               method="POST" 
                                               class="inline-block" 

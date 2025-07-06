@@ -36,7 +36,7 @@ class LoanRepository
             $query->where('approved_by', $filters['approved_by']);
         }
 
-        return $query->with(['nasabah', 'approver', 'installments', 'originalLoan', 'refinancedLoans', 'collectorTasks'])
+        return $query->with(['nasabah', 'approver', 'installments', 'originalLoan', 'refinancedLoans'])
                     ->get();
     }
 
@@ -48,7 +48,7 @@ class LoanRepository
      */
     public function findById(int $id): ?Loan
     {
-        return $this->model->with(['nasabah', 'approver', 'installments', 'originalLoan', 'refinancedLoans', 'collectorTasks'])
+        return $this->model->with(['nasabah', 'approver', 'installments', 'originalLoan', 'refinancedLoans'])
                           ->findOrFail($id);
     }
 
@@ -113,7 +113,7 @@ class LoanRepository
     {
         $loan = $this->findById($id);
         $loan->update([
-            'status' => 'approved',
+            'status' => 'active',
             'approved_by' => $approverId,
             'disbursement_date' => now(),
         ]);

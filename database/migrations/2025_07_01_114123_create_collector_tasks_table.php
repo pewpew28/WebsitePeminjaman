@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('collector_id')->constrained('users')->onDelete('cascade')->comment('ID user Collector yang ditugaskan');
             $table->foreignId('nasabah_id')->constrained('nasabahs')->onDelete('cascade')->comment('ID nasabah yang akan dikunjungi');
-            $table->foreignId('loan_id')->nullable()->constrained('loans')->onDelete('set null')->comment('ID pinjaman terkait (bisa null jika tugas umum)');
+            $table->foreignId('installment_id')->nullable()->constrained('installments')->onDelete('set null')->comment('ID pinjaman terkait (bisa null jika tugas umum)');
             $table->date('assigned_date')->comment('Tanggal tugas diberikan');
             $table->date('due_date')->comment('Tanggal jatuh tempo tugas');
             $table->string('status')->default('assigned')->comment('Status tugas (assigned, pending, done, failed, rescheduled)');

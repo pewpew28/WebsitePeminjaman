@@ -139,7 +139,7 @@
     <div class="mb-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Aksi Cepat</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href=""
+            <a href="{{ route('admin.nasabahs.index') }}"
                 class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow group">
                 <div class="flex items-center justify-between mb-4">
                     <div class="bg-blue-100 p-3 rounded-full group-hover:bg-blue-200 transition-colors">
@@ -158,7 +158,7 @@
                 <p class="text-sm text-gray-600">Kelola data nasabah, tambah nasabah baru, dan update informasi</p>
             </a>
 
-            <a href=""
+            <a href="{{ route('admin.loans.index') }}"
                 class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow group">
                 <div class="flex items-center justify-between mb-4">
                     <div class="bg-green-100 p-3 rounded-full group-hover:bg-green-200 transition-colors">
